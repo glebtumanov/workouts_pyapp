@@ -1,0 +1,107 @@
+<!-- Форма упражнения -->
+<div class="exercise-form">
+
+
+    <!-- Скрытое поле с кодом упражнения (для редактирования) -->
+    {% if exercise and exercise.code %}
+        <input type="hidden" class="exercise-code" value="{{ exercise.code }}">
+    {% endif %}
+
+    <!-- Название упражнения -->
+    <div class="mb-3">
+        <label class="form-label">
+            Название упражнения <span class="text-danger">*</span>
+        </label>
+        <input type="text"
+               class="form-control exercise-name"
+               value="{{ exercise.name if exercise else '' }}"
+               required
+               maxlength="100"
+               placeholder="Введите название упражнения">
+    </div>
+
+    <!-- Скрытые поля для совместимости с JavaScript -->
+    <input type="hidden" class="exercise-description" value="">
+    <input type="hidden" class="exercise-video-url" value="">
+
+    <!-- Параметры тренировки -->
+    <div class="row">
+        <div class="col-md-4 mb-3">
+            <label class="form-label">
+                Подходы <span class="text-danger">*</span>
+            </label>
+            <input type="number"
+                   class="form-control round-count"
+                   value="{{ exercise.round_count if exercise else defaults.default_round_count }}"
+                   min="1"
+                   max="99"
+                   required>
+        </div>
+
+        <div class="col-md-4 mb-3">
+            <label class="form-label">
+                Повторения <span class="text-danger">*</span>
+            </label>
+            <input type="number"
+                   class="form-control repeat-count"
+                   value="{{ exercise.repeat_count if exercise else defaults.default_repeat_count }}"
+                   min="1"
+                   max="999"
+                   required>
+        </div>
+
+        <div class="col-md-4 mb-3">
+            <label class="form-label">
+                Отдых (сек) <span class="text-danger">*</span>
+            </label>
+            <input type="number"
+                   class="form-control rest-seconds"
+                   value="{{ exercise.rest_seconds if exercise else defaults.default_rest_seconds }}"
+                   min="0"
+                   max="9999"
+                   required>
+        </div>
+    </div>
+
+    <!-- Изображения -->
+    <div class="mb-3">
+        <label class="form-label">Изображения упражнения</label>
+
+        <!-- Существующие изображения -->
+        {% if exercise and exercise.images %}
+            <div class="existing-images mb-2">
+                <p class="small text-muted mb-2">Текущие изображения:</p>
+                <div class="row">
+                    {% for image_path in exercise.images %}
+                        <div class="col-auto existing-image mb-2">
+                            <div class="position-relative">
+                                <img src="{{ url_for('static', filename=image_path) }}"
+                                     data-path="{{ image_path }}"
+                                     class="img-thumbnail"
+                                     style="max-width: 100px; max-height: 100px;">
+                                <button type="button"
+                                        class="btn btn-danger btn-sm position-absolute top-0 end-0 remove-image"
+                                        style="transform: translate(50%, -50%); padding: 0.25rem 0.5rem;">
+                                    <i class="bi bi-x"></i>
+                                </button>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        {% endif %}
+
+        <!-- Загрузка новых изображений -->
+        <input type="file"
+               class="form-control exercise-images"
+               accept="image/*"
+               multiple>
+        <div class="form-text">
+            Форматы: PNG, JPG, JPEG, GIF, WebP. Максимальный размер файла: 16MB
+        </div>
+
+        <!-- Превью новых изображений -->
+        <div class="image-preview mt-2"></div>
+    </div>
+</div>
+

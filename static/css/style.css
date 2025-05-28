@@ -1,0 +1,155 @@
+/* Кастомные стили для приложения домашних тренировок */
+
+/* Общие стили */
+body {
+    background-color: #212529;
+    color: #ffffff;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* Карточки комплексов */
+.card {
+    border: none;
+    background-color: #343a40;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+
+/* Кликабельные карточки */
+.card-hover {
+    cursor: pointer;
+}
+
+.card-hover:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+    background-color: #3d4349 !important;
+}
+
+.card-body {
+    color: #ffffff;
+}
+
+.card-title {
+    color: #ffffff;
+}
+
+.card-text {
+    color: #adb5bd;
+}
+
+/* Кнопки */
+.btn {
+    border-radius: 6px;
+    font-weight: 500;
+}
+
+.btn-group .btn {
+    border-radius: 0;
+}
+
+.btn-group .btn:first-child {
+    border-top-left-radius: 6px;
+    border-bottom-left-radius: 6px;
+}
+
+.btn-group .btn:last-child {
+    border-top-right-radius: 6px;
+    border-bottom-right-radius: 6px;
+}
+
+/* Формы */
+.form-control:focus {
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+}
+
+/* Навигация */
+.navbar-brand {
+    font-size: 1.5rem;
+}
+
+/* Модальные окна */
+.modal-content {
+    border-radius: 8px;
+}
+
+/* Алерты */
+.alert {
+    border-radius: 6px;
+    border: none;
+}
+
+/* Упражнения */
+.exercise-item {
+    background-color: #495057;
+    border-color: #6c757d !important;
+    transition: background-color 0.2s ease;
+}
+
+.exercise-item:hover {
+    background-color: #5a6268;
+}
+
+.exercise-form h6 {
+    color: #ffffff;
+}
+
+.exercise-title {
+    font-weight: 600;
+}
+
+/* Превью изображений */
+.image-preview img {
+    border-radius: 4px;
+    object-fit: cover;
+}
+
+.existing-image {
+    position: relative;
+}
+
+.existing-image .btn {
+    font-size: 0.75rem;
+    line-height: 1;
+}
+
+/* Анимации для добавления/удаления упражнений */
+.exercise-item {
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+    .btn-group {
+        width: 100%;
+    }
+
+    .btn-group .btn {
+        flex: 1;
+    }
+
+    .card-title {
+        font-size: 1.1rem;
+    }
+
+    .exercise-item {
+        padding: 1rem !important;
+    }
+
+    .image-preview img {
+        max-width: 80px !important;
+        max-height: 80px !important;
+    }
+}

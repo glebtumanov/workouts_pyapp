@@ -1,0 +1,1033 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} - Домашние тренировки{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-10 col-lg-8">
+        <!-- Основная информация о комплексе -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h4 class="mb-0">{{ title }}</h4>
+            </div>
+            <div class="card-body">
+                {% if workout_set and workout_set.code %}
+                    <form id="workoutSetForm" method="POST" action="{{ url_for('workout_sets_update', code=workout_set.code) }}" enctype="multipart/form-data">
+                {% else %}
+                    <form id="workoutSetForm" method="POST" action="{{ url_for('workout_sets_create') }}" enctype="multipart/form-data">
+                {% endif %}
+
+                    <div class="mb-3">
+                        <label for="name" class="form-label">
+                            Название комплекса <span class="text-danger">*</span>
+                        </label>
+                        <input type="text"
+                               class="form-control"
+                               id="name"
+                               name="name"
+                               value="{{ workout_set.name if workout_set else '' }}"
+                               required
+                               maxlength="100"
+                               placeholder="Введите название комплекса">
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Описание</label>
+                        <textarea class="form-control"
+                                  id="description"
+                                  name="description"
+                                  rows="3"
+                                  maxlength="500"
+                                  placeholder="Опишите цель и особенности комплекса">{{ workout_set.description if workout_set else '' }}</textarea>
+                    </div>
+
+                    <!-- Кнопки управления основной информацией комплекса -->
+                    {% if workout_set and workout_set.code %}
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-3 pt-3 border-top">
+                        <a href="{{ url_for('workout_sets_list') }}" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> Отмена
+                        </a>
+                        <button type="submit" class="btn btn-primary" onclick="console.log('Клик по кнопке Сохранить напрямую');">
+                            <i class="bi bi-check-circle"></i> Сохранить
+                        </button>
+                    </div>
+                    {% endif %}
+            </div>
+        </div>
+
+                <!-- Упражнения - показываем только при редактировании -->
+        {% if workout_set and workout_set.code %}
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Упражнения</h5>
+                <button type="button" class="btn btn-primary btn-sm" id="addExerciseBtn">
+                    <i class="bi bi-plus-circle"></i> Добавить упражнение
+                </button>
+            </div>
+            <div class="card-body">
+                <!-- Форма добавления нового упражнения -->
+                <div id="newExerciseForm" class="d-none">
+                    <div class="border rounded p-3 mb-3">
+                        {% set exercise = {} %}
+                        {% include 'workout_sets/_exercise_form.html' %}
+
+                        <div class="d-flex gap-2 mt-3">
+                            <button type="button" class="btn btn-success" id="saveExerciseBtn">
+                                <i class="bi bi-check-circle"></i> Сохранить
+                            </button>
+                            <button type="button" class="btn btn-secondary" id="cancelExerciseBtn">
+                                <i class="bi bi-x-circle"></i> Отмена
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Список добавленных упражнений -->
+                <div id="exercisesList">
+                    {% if exercises %}
+                        {% for exercise in exercises %}
+                            <div class="exercise-card border rounded p-3 mb-3" data-exercise-index="{{ loop.index0 }}">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <h6 class="mb-0">
+                                        <i class="bi bi-dumbbell"></i> {{ exercise.name }}
+                                    </h6>
+                                    <div class="btn-group btn-group-sm">
+                                        <button type="button" class="btn btn-outline-primary edit-exercise-btn" data-exercise-index="{{ loop.index0 }}">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-outline-danger delete-exercise-btn" data-exercise-index="{{ loop.index0 }}">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="row">
+                                    <div class="col-auto">
+                                        <small class="text-muted">Подходы:</small>
+                                        <span class="badge bg-success">{{ exercise.round_count }}</span>
+                                    </div>
+                                    <div class="col-auto">
+                                        <small class="text-muted">Повторения:</small>
+                                        <span class="badge bg-primary">{{ exercise.repeat_count }}</span>
+                                    </div>
+                                    <div class="col-auto">
+                                        <small class="text-muted">Отдых:</small>
+                                        <span class="badge bg-secondary">{{ exercise.rest_seconds }}с</span>
+                                    </div>
+                                    <div class="col-auto">
+                                        <small class="text-muted">Фото:</small>
+                                        <span class="badge bg-dark">{{ exercise.images|length if exercise.images else 0 }}</span>
+                                    </div>
+                                </div>
+
+                                <!-- Скрытые данные упражнения -->
+                                <input type="hidden" class="exercise-data" value="{{ exercise|tojson }}">
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <div id="noExercisesMessage" class="text-muted text-center py-3">
+                            Упражнений пока нет. Нажмите "Добавить упражнение" для создания первого упражнения.
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Кнопки управления - только при создании комплекса -->
+        {% if not workout_set or not workout_set.code %}
+        <div class="card">
+            <div class="card-body">
+                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                    <a href="{{ url_for('workout_sets_list') }}" class="btn btn-secondary">
+                        <i class="bi bi-arrow-left"></i> Отмена
+                    </a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-circle"></i> Создать комплекс
+                    </button>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <!-- Скрытое поле для данных упражнений - только при редактировании -->
+        <input type="hidden" name="exercises_data" id="exercisesData">
+        {% endif %}
+                </form>
+
+        {% if workout_set and workout_set.code %}
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="mb-0">Информация о комплексе</h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-sm-6">
+                        <p class="mb-1"><strong>Создан:</strong></p>
+                        <p class="text-muted">{{ workout_set.created_at[:19].replace('T', ' ') }}</p>
+                    </div>
+                    <div class="col-sm-6">
+                        <p class="mb-1"><strong>Изменен:</strong></p>
+                        <p class="text-muted">{{ workout_set.updated_at[:19].replace('T', ' ') }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const exercisesList = document.getElementById('exercisesList');
+    const addBtn = document.getElementById('addExerciseBtn');
+    const newExerciseForm = document.getElementById('newExerciseForm');
+    const saveExerciseBtn = document.getElementById('saveExerciseBtn');
+    const cancelExerciseBtn = document.getElementById('cancelExerciseBtn');
+    const form = document.getElementById('workoutSetForm');
+    const exercisesDataInput = document.getElementById('exercisesData');
+    const noExercisesMessage = document.getElementById('noExercisesMessage');
+
+    // Общие обработчики формы (для всех случаев)
+    // Обработка отправки формы
+    form.addEventListener('submit', function(e) {
+        console.log('Событие submit формы сработало');
+        console.log('Форма:', form);
+        console.log('Action формы:', form.action);
+        console.log('Method формы:', form.method);
+
+        // Собираем данные из карточек упражнений только если есть блок упражнений
+        if (exercisesList && exercisesDataInput) {
+            console.log('Обрабатываем данные упражнений');
+            const exercisesData = [];
+
+            exercisesList.querySelectorAll('.exercise-card').forEach((card, index) => {
+                const hiddenData = card.querySelector('.exercise-data');
+                if (hiddenData) {
+                    try {
+                        const exerciseData = JSON.parse(hiddenData.value);
+                        exercisesData.push(exerciseData);
+                    } catch (err) {
+                        console.error('Ошибка парсинга данных упражнения:', err);
+                    }
+                }
+            });
+
+            exercisesDataInput.value = JSON.stringify(exercisesData);
+            console.log('Данные упражнений подготовлены:', exercisesData.length);
+        } else {
+            console.log('Блок упражнений не найден, отправляем только основную информацию');
+        }
+
+        console.log('Форма готова к отправке, не блокируем submit');
+    });
+
+    // Проверим все кнопки сохранения
+    const submitButtons = form.querySelectorAll('button[type="submit"]');
+    console.log('Найдено кнопок submit:', submitButtons.length);
+
+    submitButtons.forEach((btn, index) => {
+        console.log(`Кнопка ${index}:`, btn.textContent.trim());
+        btn.addEventListener('click', function(e) {
+            console.log(`Клик по кнопке submit ${index}:`, this.textContent.trim());
+
+            // Проверяем валидность формы
+            if (!form.checkValidity()) {
+                console.log('Форма не прошла валидацию HTML5');
+                return;
+            }
+
+            console.log('Кнопка готова отправить форму');
+        });
+    });
+
+    // Автофокус на название
+    const nameInput = document.getElementById('name');
+    if (nameInput) nameInput.focus();
+
+    // Если блок упражнений отсутствует (создание нового комплекса), завершаем инициализацию
+    if (!exercisesList || !addBtn) {
+        console.log('Режим создания комплекса - блок упражнений не найден');
+        return;
+    }
+
+    let exerciseIndex = {{ exercises|length if exercises else 0 }};
+    let imageFileIndex = 0;
+    let exercises = [];
+
+    // Настройки по умолчанию
+    const defaultValues = {
+        repeat_count: {{ defaults.default_repeat_count }},
+        round_count: {{ defaults.default_round_count }},
+        rest_seconds: {{ defaults.default_rest_seconds }}
+    };
+
+    // Загружаем существующие упражнения
+    {% if exercises %}
+        {% for exercise in exercises %}
+            exercises.push({{ exercise|tojson }});
+        {% endfor %}
+    {% endif %}
+
+    // Показать форму добавления упражнения
+    addBtn.addEventListener('click', function() {
+        addBtn.style.display = 'none';
+        newExerciseForm.classList.remove('d-none');
+
+        // Заполняем значения по умолчанию
+        const exerciseForm = newExerciseForm.querySelector('.exercise-form');
+        if (!exerciseForm) {
+            console.error('Exercise form not found');
+            alert('Ошибка: форма упражнения не найдена');
+            addBtn.style.display = 'inline-block';
+            newExerciseForm.classList.add('d-none');
+            return;
+        }
+
+        const repeatField = exerciseForm.querySelector('.repeat-count');
+        const roundField = exerciseForm.querySelector('.round-count');
+        const restField = exerciseForm.querySelector('.rest-seconds');
+        const nameField = exerciseForm.querySelector('.exercise-name');
+
+        if (repeatField) repeatField.value = defaultValues.repeat_count;
+        if (roundField) roundField.value = defaultValues.round_count;
+        if (restField) restField.value = defaultValues.rest_seconds;
+
+        // Включаем required для полей формы упражнения
+        enableExerciseFormValidation(exerciseForm, true);
+
+        // Фокус на название упражнения
+        if (nameField) nameField.focus();
+
+        // Привязываем обработчики для превью изображений
+        bindImagePreview(exerciseForm);
+    });
+
+    // Отмена добавления упражнения
+    cancelExerciseBtn.addEventListener('click', function() {
+        hideNewExerciseForm();
+        clearExerciseForm();
+    });
+
+        // Сохранение упражнения
+    saveExerciseBtn.addEventListener('click', function() {
+        const exerciseForm = newExerciseForm.querySelector('.exercise-form');
+        const name = exerciseForm.querySelector('.exercise-name').value.trim();
+
+        if (!name) {
+            alert('Пожалуйста, введите название упражнения');
+            return;
+        }
+
+        // Создаем упражнение через AJAX
+        createExercise(exerciseForm);
+    });
+
+    // Скрыть форму добавления упражнения
+    function hideNewExerciseForm() {
+        addBtn.style.display = 'inline-block';
+        newExerciseForm.classList.add('d-none');
+
+        // Отключаем required для скрытых полей
+        const exerciseForm = newExerciseForm.querySelector('.exercise-form');
+        enableExerciseFormValidation(exerciseForm, false);
+    }
+
+    // Очистить форму упражнения
+    function clearExerciseForm() {
+        if (!newExerciseForm) {
+            console.error('newExerciseForm is null');
+            return;
+        }
+
+        const exerciseForm = newExerciseForm.querySelector('.exercise-form');
+        if (!exerciseForm) {
+            console.error('exercise-form not found');
+            return;
+        }
+
+        const nameField = exerciseForm.querySelector('.exercise-name');
+        const descField = exerciseForm.querySelector('.exercise-description');
+        const videoField = exerciseForm.querySelector('.exercise-video-url');
+        const imageField = exerciseForm.querySelector('.exercise-images');
+        const previewField = exerciseForm.querySelector('.image-preview');
+        const existingImagesContainer = exerciseForm.querySelector('.existing-images-container');
+        const deletedImagesInput = exerciseForm.querySelector('.deleted-images');
+
+        if (nameField) nameField.value = '';
+        if (descField) descField.value = '';
+        if (videoField) videoField.value = '';
+        if (imageField) imageField.value = '';
+        if (previewField) previewField.innerHTML = '';
+        if (existingImagesContainer) existingImagesContainer.remove();
+        if (deletedImagesInput) deletedImagesInput.remove();
+    }
+
+    // Собрать данные упражнения из формы
+    function collectExerciseData(exerciseForm) {
+        if (!exerciseForm) {
+            console.error('exerciseForm is null');
+            return null;
+        }
+
+        const nameField = exerciseForm.querySelector('.exercise-name');
+        const descField = exerciseForm.querySelector('.exercise-description');
+        const videoField = exerciseForm.querySelector('.exercise-video-url');
+        const repeatField = exerciseForm.querySelector('.repeat-count');
+        const roundField = exerciseForm.querySelector('.round-count');
+        const restField = exerciseForm.querySelector('.rest-seconds');
+        const imageInput = exerciseForm.querySelector('.exercise-images');
+
+        if (!nameField || !repeatField || !roundField || !restField) {
+            console.error('Required fields not found in exercise form');
+            return null;
+        }
+
+        const imageIndices = [];
+        if (imageInput && imageInput.files.length > 0) {
+            Array.from(imageInput.files).forEach(() => {
+                imageIndices.push(String(imageFileIndex));
+                imageFileIndex++;
+            });
+        }
+
+        return {
+            code: '',
+            name: nameField.value,
+            description: descField ? descField.value : '',
+            video_url: videoField ? videoField.value : '',
+            repeat_count: parseInt(repeatField.value) || defaultValues.repeat_count,
+            round_count: parseInt(roundField.value) || defaultValues.round_count,
+            rest_seconds: parseInt(restField.value) || defaultValues.rest_seconds,
+            existing_images: [],
+            image_indices: imageIndices,
+            images: [] // Для отображения
+        };
+    }
+
+    // Отобразить карточку упражнения
+    function renderExerciseCard(exerciseData, index) {
+        const cardHtml = `
+            <div class="exercise-card border rounded p-3 mb-3" data-exercise-index="${index}">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <h6 class="mb-0">
+                        <i class="bi bi-dumbbell"></i> ${exerciseData.name}
+                    </h6>
+                    <div class="btn-group btn-group-sm">
+                        <button type="button" class="btn btn-outline-danger delete-exercise-btn" data-exercise-index="${index}">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-auto">
+                        <small class="text-muted">Подходы:</small>
+                        <span class="badge bg-success">${exerciseData.round_count}</span>
+                    </div>
+                    <div class="col-auto">
+                        <small class="text-muted">Повторения:</small>
+                        <span class="badge bg-primary">${exerciseData.repeat_count}</span>
+                    </div>
+                    <div class="col-auto">
+                        <small class="text-muted">Отдых:</small>
+                        <span class="badge bg-secondary">${exerciseData.rest_seconds}с</span>
+                    </div>
+                    <div class="col-auto">
+                        <small class="text-muted">Фото:</small>
+                        <span class="badge bg-dark">${exerciseData.images ? exerciseData.images.length : 0}</span>
+                    </div>
+                </div>
+
+                <input type="hidden" class="exercise-data" value='${JSON.stringify(exerciseData)}'>
+            </div>
+        `;
+
+        if (noExercisesMessage && noExercisesMessage.style.display !== 'none') {
+            exercisesList.innerHTML = cardHtml;
+        } else {
+            exercisesList.insertAdjacentHTML('beforeend', cardHtml);
+        }
+
+        // Привязываем события к новой карточке
+        const newCard = exercisesList.lastElementChild;
+        bindExerciseCardEvents(newCard);
+    }
+
+        // Привязка событий к карточке упражнения
+    function bindExerciseCardEvents(card) {
+        if (!card) {
+            console.error('Card is null in bindExerciseCardEvents');
+            return;
+        }
+
+        const deleteBtn = card.querySelector('.delete-exercise-btn');
+        const editBtn = card.querySelector('.edit-exercise-btn');
+
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', function() {
+                const exerciseIndex = parseInt(this.dataset.exerciseIndex);
+                if (isNaN(exerciseIndex) || exerciseIndex < 0 || exerciseIndex >= exercises.length) {
+                    console.error('Invalid exercise index:', exerciseIndex);
+                    return;
+                }
+
+                const exerciseData = exercises[exerciseIndex];
+                if (!exerciseData || !exerciseData.code) {
+                    console.error('Exercise data not found or missing code');
+                    return;
+                }
+
+                deleteExercise(exerciseData.code, exerciseIndex, card);
+            });
+        }
+
+        if (editBtn) {
+            editBtn.addEventListener('click', function() {
+                const exerciseIndex = parseInt(this.dataset.exerciseIndex);
+                if (isNaN(exerciseIndex) || exerciseIndex < 0 || exerciseIndex >= exercises.length) {
+                    console.error('Invalid exercise index:', exerciseIndex);
+                    return;
+                }
+
+                const exerciseData = exercises[exerciseIndex];
+                if (!exerciseData) {
+                    console.error('Exercise data not found');
+                    return;
+                }
+
+                editExercise(exerciseData, exerciseIndex, card);
+            });
+        }
+    }
+
+    // Удаление файлов изображений упражнения
+    function removeExerciseImages(exerciseIdx) {
+        // Находим и удаляем все скрытые input'ы файлов для данного упражнения
+        const imageInputs = form.querySelectorAll(`input[name^="exercise_${exerciseIdx}_image_"]`);
+        imageInputs.forEach(input => input.remove());
+    }
+
+    // Обновить индексы упражнений
+    function updateExerciseIndices() {
+        exercisesList.querySelectorAll('.exercise-card').forEach((card, index) => {
+            card.dataset.exerciseIndex = index;
+            const deleteBtn = card.querySelector('.delete-exercise-btn');
+            if (deleteBtn) {
+                deleteBtn.dataset.exerciseIndex = index;
+            }
+        });
+    }
+
+    // Сохранение файлов изображений для отправки
+    function saveExerciseImages(exerciseForm, exerciseIdx) {
+        const imageInput = exerciseForm.querySelector('.exercise-images');
+        if (imageInput && imageInput.files.length > 0) {
+            // Создаем скрытые input'ы для каждого файла
+            Array.from(imageInput.files).forEach((file, fileIndex) => {
+                const hiddenInput = document.createElement('input');
+                hiddenInput.type = 'file';
+                hiddenInput.name = `exercise_${exerciseIdx}_image_${fileIndex}`;
+                hiddenInput.style.display = 'none';
+
+                // Создаем новый FileList с одним файлом
+                const dt = new DataTransfer();
+                dt.items.add(file);
+                hiddenInput.files = dt.files;
+
+                form.appendChild(hiddenInput);
+            });
+        }
+    }
+
+    // Привязка обработчика для превью изображений
+    function bindImagePreview(exerciseForm) {
+        if (!exerciseForm) {
+            console.error('exerciseForm is null in bindImagePreview');
+            return;
+        }
+
+        const imageInput = exerciseForm.querySelector('.exercise-images');
+        const imagePreview = exerciseForm.querySelector('.image-preview');
+
+        if (imageInput && imagePreview) {
+            imageInput.addEventListener('change', function() {
+                const files = Array.from(this.files);
+                imagePreview.innerHTML = '';
+
+                files.forEach((file) => {
+                    if (file.type.startsWith('image/')) {
+                        const reader = new FileReader();
+                        reader.onload = function(e) {
+                            const img = document.createElement('img');
+                            img.src = e.target.result;
+                            img.className = 'img-thumbnail me-2 mb-2';
+                            img.style.maxWidth = '150px';
+                            img.style.maxHeight = '150px';
+                            imagePreview.appendChild(img);
+                        };
+                        reader.readAsDataURL(file);
+                    }
+                });
+            });
+        } else {
+            console.error('Image input or preview element not found');
+        }
+    }
+
+    // Функция для отображения существующих изображений при редактировании
+    function displayExistingImages(exerciseForm, images) {
+        if (!exerciseForm || !images) return;
+
+        // Находим или создаем контейнер для существующих изображений
+        let existingImagesContainer = exerciseForm.querySelector('.existing-images-container');
+        if (!existingImagesContainer) {
+            existingImagesContainer = document.createElement('div');
+            existingImagesContainer.className = 'existing-images-container mb-3';
+
+            // Вставляем перед полем загрузки новых изображений
+            const imageInput = exerciseForm.querySelector('.exercise-images');
+            imageInput.parentNode.insertBefore(existingImagesContainer, imageInput);
+        }
+
+        if (images.length > 0) {
+            existingImagesContainer.innerHTML = `
+                <label class="form-label">Текущие изображения:</label>
+                <div class="existing-images-grid d-flex flex-wrap gap-2">
+                    ${images.map((imagePath, index) => `
+                        <div class="existing-image-item position-relative" data-image-path="${imagePath}">
+                            <img src="/static/${imagePath}"
+                                 class="img-thumbnail"
+                                 style="max-width: 150px; max-height: 150px;">
+                            <button type="button"
+                                    class="btn btn-danger btn-sm position-absolute top-0 end-0 remove-existing-image"
+                                    style="transform: translate(50%, -50%); padding: 0.2rem 0.4rem; font-size: 0.75rem;"
+                                    data-image-path="${imagePath}"
+                                    title="Удалить изображение">
+                                <i class="bi bi-x"></i>
+                            </button>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+
+            // Привязываем обработчики удаления для существующих изображений
+            existingImagesContainer.querySelectorAll('.remove-existing-image').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const imagePath = this.dataset.imagePath;
+                    const imageItem = this.closest('.existing-image-item');
+
+                    // Помечаем изображение как удаленное
+                    markImageForDeletion(exerciseForm, imagePath);
+
+                    // Удаляем элемент из DOM
+                    imageItem.remove();
+
+                    // Проверяем, есть ли еще изображения
+                    const remainingImages = existingImagesContainer.querySelectorAll('.existing-image-item');
+                    if (remainingImages.length === 0) {
+                        existingImagesContainer.style.display = 'none';
+                    }
+                });
+            });
+        } else {
+            existingImagesContainer.style.display = 'none';
+        }
+    }
+
+    // Функция для пометки изображения на удаление
+    function markImageForDeletion(exerciseForm, imagePath) {
+        // Находим или создаем скрытое поле для списка удаляемых изображений
+        let deletedImagesInput = exerciseForm.querySelector('.deleted-images');
+        if (!deletedImagesInput) {
+            deletedImagesInput = document.createElement('input');
+            deletedImagesInput.type = 'hidden';
+            deletedImagesInput.className = 'deleted-images';
+            deletedImagesInput.value = '';
+            exerciseForm.appendChild(deletedImagesInput);
+        }
+
+        // Добавляем путь к изображению в список удаляемых
+        const deletedImages = deletedImagesInput.value ? deletedImagesInput.value.split(',') : [];
+        if (!deletedImages.includes(imagePath)) {
+            deletedImages.push(imagePath);
+            deletedImagesInput.value = deletedImages.join(',');
+        }
+    }
+
+    // Функция для управления валидацией формы упражнения
+    function enableExerciseFormValidation(exerciseForm, enable) {
+        if (!exerciseForm) {
+            console.error('exerciseForm is null in enableExerciseFormValidation');
+            return;
+        }
+
+        const requiredFields = [
+            '.exercise-name',
+            '.round-count',
+            '.repeat-count',
+            '.rest-seconds'
+        ];
+
+        requiredFields.forEach(selector => {
+            const field = exerciseForm.querySelector(selector);
+            if (field) {
+                if (enable) {
+                    field.setAttribute('required', '');
+                } else {
+                    field.removeAttribute('required');
+                }
+            } else {
+                console.error(`Field ${selector} not found in exercise form`);
+            }
+        });
+    }
+
+
+
+    // Отключаем валидацию для изначально скрытой формы упражнения
+    if (newExerciseForm && newExerciseForm.classList.contains('d-none')) {
+        const exerciseForm = newExerciseForm.querySelector('.exercise-form');
+        if (exerciseForm) {
+            enableExerciseFormValidation(exerciseForm, false);
+        }
+    }
+
+    // Функция для создания упражнения через AJAX
+    function createExercise(exerciseForm) {
+        if (!exerciseForm) {
+            alert('Форма упражнения не найдена');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('workoutset_code', '{{ workout_set.code }}');
+
+        const nameField = exerciseForm.querySelector('.exercise-name');
+        const repeatField = exerciseForm.querySelector('.repeat-count');
+        const roundField = exerciseForm.querySelector('.round-count');
+        const restField = exerciseForm.querySelector('.rest-seconds');
+        const descField = exerciseForm.querySelector('.exercise-description');
+        const videoField = exerciseForm.querySelector('.exercise-video-url');
+
+        if (!nameField || !repeatField || !roundField || !restField) {
+            alert('Не все обязательные поля найдены в форме');
+            return;
+        }
+
+        formData.append('name', nameField.value);
+        formData.append('repeat_count', repeatField.value);
+        formData.append('round_count', roundField.value);
+        formData.append('rest_seconds', restField.value);
+        formData.append('description', descField ? descField.value : '');
+        formData.append('video_url', videoField ? videoField.value : '');
+
+        // Добавляем изображения
+        const imageInput = exerciseForm.querySelector('.exercise-images');
+        if (imageInput && imageInput.files.length > 0) {
+            Array.from(imageInput.files).forEach((file, index) => {
+                formData.append(`image_${index}`, file);
+            });
+        }
+
+        fetch('/exercises/create', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                // Добавляем упражнение в массив
+                exercises.push(data.exercise);
+
+                // Отображаем упражнение в списке
+                const newCard = document.createElement('div');
+                newCard.innerHTML = generateExerciseCardHTML(data.exercise, exercises.length - 1);
+
+                if (noExercisesMessage && noExercisesMessage.style.display !== 'none') {
+                    exercisesList.innerHTML = '';
+                    noExercisesMessage.style.display = 'none';
+                }
+
+                                const cardToAdd = newCard.firstElementChild;
+                if (cardToAdd) {
+                    exercisesList.appendChild(cardToAdd);
+
+                    // Привязываем события к новой карточке
+                    bindExerciseCardEvents(cardToAdd);
+                } else {
+                    console.error('Card element to add is null');
+                }
+
+                // Очищаем форму
+                hideNewExerciseForm();
+                clearExerciseForm();
+            } else {
+                alert('Ошибка при создании упражнения: ' + data.message);
+            }
+        })
+        .catch(error => {
+            alert('Ошибка при создании упражнения: ' + error.message);
+            console.error('Error:', error);
+        });
+    }
+
+    // Функция для генерации HTML карточки упражнения
+    function generateExerciseCardHTML(exerciseData, index) {
+        return `
+            <div class="exercise-card border rounded p-3 mb-3" data-exercise-index="${index}">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <h6 class="mb-0">
+                        <i class="bi bi-dumbbell"></i> ${exerciseData.name}
+                    </h6>
+                    <div class="btn-group btn-group-sm">
+                        <button type="button" class="btn btn-outline-primary edit-exercise-btn" data-exercise-index="${index}">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <button type="button" class="btn btn-outline-danger delete-exercise-btn" data-exercise-index="${index}">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-auto">
+                        <small class="text-muted">Подходы:</small>
+                        <span class="badge bg-success">${exerciseData.round_count}</span>
+                    </div>
+                    <div class="col-auto">
+                        <small class="text-muted">Повторения:</small>
+                        <span class="badge bg-primary">${exerciseData.repeat_count}</span>
+                    </div>
+                    <div class="col-auto">
+                        <small class="text-muted">Отдых:</small>
+                        <span class="badge bg-secondary">${exerciseData.rest_seconds}с</span>
+                    </div>
+                    <div class="col-auto">
+                        <small class="text-muted">Фото:</small>
+                        <span class="badge bg-dark">${exerciseData.images ? exerciseData.images.length : 0}</span>
+                    </div>
+                </div>
+
+                <input type="hidden" class="exercise-data" value='${JSON.stringify(exerciseData)}'>
+            </div>
+        `;
+    }
+
+    // Функция для удаления упражнения через AJAX
+    function deleteExercise(exerciseCode, exerciseIndex, card) {
+        fetch(`/exercises/${exerciseCode}/delete`, {
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                // Удаляем из массива
+                exercises.splice(exerciseIndex, 1);
+
+                // Удаляем карточку
+                card.remove();
+
+                // Обновляем индексы
+                updateExerciseIndices();
+
+                // Показываем сообщение если упражнений нет
+                if (exercises.length === 0 && noExercisesMessage) {
+                    noExercisesMessage.style.display = 'block';
+                }
+            } else {
+                alert('Ошибка при удалении упражнения: ' + data.message);
+            }
+        })
+        .catch(error => {
+            alert('Ошибка при удалении упражнения: ' + error.message);
+            console.error('Error:', error);
+        });
+    }
+
+    // Функция для редактирования упражнения
+    function editExercise(exerciseData, exerciseIndex, card) {
+        // Скрываем кнопку "Добавить упражнение"
+        addBtn.style.display = 'none';
+
+        // Показываем форму и заполняем данными
+        newExerciseForm.classList.remove('d-none');
+        const exerciseForm = newExerciseForm.querySelector('.exercise-form');
+
+        exerciseForm.querySelector('.exercise-name').value = exerciseData.name || '';
+        exerciseForm.querySelector('.repeat-count').value = exerciseData.repeat_count || defaultValues.repeat_count;
+        exerciseForm.querySelector('.round-count').value = exerciseData.round_count || defaultValues.round_count;
+        exerciseForm.querySelector('.rest-seconds').value = exerciseData.rest_seconds || defaultValues.rest_seconds;
+
+        // Устанавливаем код упражнения в скрытое поле
+        let exerciseCodeInput = exerciseForm.querySelector('.exercise-code');
+        if (!exerciseCodeInput) {
+            exerciseCodeInput = document.createElement('input');
+            exerciseCodeInput.type = 'hidden';
+            exerciseCodeInput.className = 'exercise-code';
+            exerciseForm.appendChild(exerciseCodeInput);
+        }
+        exerciseCodeInput.value = exerciseData.code || '';
+
+        // Отображаем существующие изображения
+        displayExistingImages(exerciseForm, exerciseData.images || []);
+
+        // Включаем валидацию
+        enableExerciseFormValidation(exerciseForm, true);
+
+        // Привязываем обработчики для превью новых изображений
+        bindImagePreview(exerciseForm);
+
+        // Меняем обработчики кнопок для режима редактирования
+        const saveBtn = document.getElementById('saveExerciseBtn');
+        const cancelBtn = document.getElementById('cancelExerciseBtn');
+
+        // Сохраняем оригинальные обработчики
+        const originalSaveHandler = saveBtn.cloneNode(true);
+        const originalCancelHandler = cancelBtn.cloneNode(true);
+
+        // Заменяем кнопки
+        saveBtn.parentNode.replaceChild(originalSaveHandler, saveBtn);
+        cancelBtn.parentNode.replaceChild(originalCancelHandler, cancelBtn);
+
+        // Новые обработчики для редактирования
+        originalSaveHandler.addEventListener('click', function() {
+            updateExercise(exerciseData.code, exerciseIndex, card, exerciseForm);
+        });
+
+        originalCancelHandler.addEventListener('click', function() {
+            cancelEdit(originalSaveHandler, originalCancelHandler);
+        });
+
+        // Фокус на название
+        exerciseForm.querySelector('.exercise-name').focus();
+    }
+
+    // Функция для обновления упражнения через AJAX
+    function updateExercise(exerciseCode, exerciseIndex, card, exerciseForm) {
+        if (!exerciseForm) {
+            alert('Форма упражнения не найдена');
+            return;
+        }
+
+        const formData = new FormData();
+
+        const nameField = exerciseForm.querySelector('.exercise-name');
+        const repeatField = exerciseForm.querySelector('.repeat-count');
+        const roundField = exerciseForm.querySelector('.round-count');
+        const restField = exerciseForm.querySelector('.rest-seconds');
+        const descField = exerciseForm.querySelector('.exercise-description');
+        const videoField = exerciseForm.querySelector('.exercise-video-url');
+
+        if (!nameField || !repeatField || !roundField || !restField) {
+            alert('Не все обязательные поля найдены в форме');
+            return;
+        }
+
+        formData.append('name', nameField.value);
+        formData.append('repeat_count', repeatField.value);
+        formData.append('round_count', roundField.value);
+        formData.append('rest_seconds', restField.value);
+        formData.append('description', descField ? descField.value : '');
+        formData.append('video_url', videoField ? videoField.value : '');
+
+        // Добавляем список удаляемых изображений
+        const deletedImagesInput = exerciseForm.querySelector('.deleted-images');
+        if (deletedImagesInput && deletedImagesInput.value) {
+            formData.append('deleted_images', deletedImagesInput.value);
+        }
+
+        // Добавляем новые изображения
+        const imageInput = exerciseForm.querySelector('.exercise-images');
+            if (imageInput && imageInput.files.length > 0) {
+            Array.from(imageInput.files).forEach((file, index) => {
+                formData.append(`image_${index}`, file);
+            });
+        }
+
+        fetch(`/exercises/${exerciseCode}/update`, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                // Обновляем данные в массиве
+                exercises[exerciseIndex] = data.exercise;
+
+                // Перерисовываем карточку
+                const newCard = document.createElement('div');
+                newCard.innerHTML = generateExerciseCardHTML(data.exercise, exerciseIndex);
+                card.parentNode.replaceChild(newCard.firstElementChild, card);
+
+                // Привязываем события к новой карточке
+                const updatedCardElement = newCard.firstElementChild;
+                if (updatedCardElement) {
+                    bindExerciseCardEvents(updatedCardElement);
+                } else {
+                    console.error('Updated card element is null');
+                }
+
+                // Возвращаемся к режиму добавления
+                resetToAddMode();
+            } else {
+                alert('Ошибка при обновлении упражнения: ' + data.message);
+            }
+        })
+        .catch(error => {
+            alert('Ошибка при обновлении упражнения: ' + error.message);
+            console.error('Error:', error);
+        });
+    }
+
+    // Функция для отмены редактирования
+    function cancelEdit(saveBtn, cancelBtn) {
+        // Восстанавливаем оригинальные обработчики
+        resetToAddMode();
+    }
+
+    // Функция для возврата к режиму добавления
+    function resetToAddMode() {
+        hideNewExerciseForm();
+        clearExerciseForm();
+
+        // Восстанавливаем оригинальные обработчики кнопок
+        location.reload(); // Простое решение для восстановления обработчиков
+    }
+
+    // Привязываем события к существующим карточкам
+    if (exercisesList) {
+        exercisesList.querySelectorAll('.exercise-card').forEach(card => {
+            if (card) {
+                bindExerciseCardEvents(card);
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block title %}Комплексы упражнений - Домашние тренировки{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2>Комплексы упражнений</h2>
+            <a href="{{ url_for('workout_sets_new') }}" class="btn btn-primary">
+                <i class="bi bi-plus-circle"></i> Создать комплекс
+            </a>
+        </div>
+
+        {% if workout_sets %}
+            <div class="row">
+                {% for workout_set in workout_sets %}
+                    <div class="col-md-6 col-lg-4 mb-3">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h5 class="card-title">{{ workout_set.name }}</h5>
+                                {% if workout_set.description %}
+                                    <p class="card-text">{{ workout_set.description }}</p>
+                                {% endif %}
+                            </div>
+                            <div class="card-footer bg-transparent">
+                                <div class="btn-group w-100" role="group">
+                                    <a href="#" class="btn btn-success btn-sm">
+                                        <i class="bi bi-play-circle"></i> Начать тренировку
+                                    </a>
+                                    <a href="{{ url_for('workout_sets_edit', code=workout_set.code) }}"
+                                       class="btn btn-primary btn-sm">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    <a href="#"
+                                       class="btn btn-danger btn-sm"
+                                       data-bs-toggle="modal"
+                                       data-bs-target="#deleteModal"
+                                       data-code="{{ workout_set.code }}"
+                                       data-name="{{ workout_set.name }}">
+                                        <i class="bi bi-trash"></i>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="text-center py-5">
+                <i class="bi bi-clipboard-x fs-1 text-muted mb-3"></i>
+                <h4 class="text-muted">Комплексы не найдены</h4>
+                <p class="text-muted">Создайте свой первый комплекс упражнений</p>
+                <a href="{{ url_for('workout_sets_new') }}" class="btn btn-primary">
+                    <i class="bi bi-plus-circle"></i> Создать комплекс
+                </a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Модальное окно подтверждения удаления -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Подтверждение удаления</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                Вы уверены, что хотите удалить комплекс "<span id="deleteItemName"></span>"?
+                <br><br>
+                <strong class="text-danger">Это действие нельзя отменить!</strong>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <form id="deleteForm" method="POST" style="display: inline;">
+                    <button type="submit" class="btn btn-danger">Удалить</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const deleteModal = document.getElementById('deleteModal');
+    const deleteForm = document.getElementById('deleteForm');
+    const deleteItemName = document.getElementById('deleteItemName');
+
+    deleteModal.addEventListener('show.bs.modal', function(event) {
+        const button = event.relatedTarget;
+        const code = button.getAttribute('data-code');
+        const name = button.getAttribute('data-name');
+
+        deleteItemName.textContent = name;
+        deleteForm.action = `/workout-sets/${code}/delete`;
+    });
+});
+</script>
+{% endblock %}

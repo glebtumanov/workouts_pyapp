@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block title %}Настройки - Домашние тренировки{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="mb-0">⚙️ Настройки приложения</h4>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('settings_save') }}">
+                    <p class="text-muted mb-4">
+                        Настройте значения по умолчанию, которые будут использоваться при создании новых упражнений.
+                    </p>
+
+                    <div class="mb-3">
+                        <label for="default_round_count" class="form-label">
+                            Число подходов по умолчанию <span class="text-danger">*</span>
+                        </label>
+                        <input type="number"
+                               class="form-control"
+                               id="default_round_count"
+                               name="default_round_count"
+                               value="{{ prefs.default_round_count if prefs else 3 }}"
+                               min="1"
+                               max="99"
+                               required>
+                        <div class="form-text">Количество подходов для нового упражнения</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="default_repeat_count" class="form-label">
+                            Число повторений по умолчанию <span class="text-danger">*</span>
+                        </label>
+                        <input type="number"
+                               class="form-control"
+                               id="default_repeat_count"
+                               name="default_repeat_count"
+                               value="{{ prefs.default_repeat_count if prefs else 10 }}"
+                               min="1"
+                               max="999"
+                               required>
+                        <div class="form-text">Количество повторений в одном подходе</div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="default_rest_seconds" class="form-label">
+                            Время отдыха в сек. по умолчанию <span class="text-danger">*</span>
+                        </label>
+                        <input type="number"
+                               class="form-control"
+                               id="default_rest_seconds"
+                               name="default_rest_seconds"
+                               value="{{ prefs.default_rest_seconds if prefs else 60 }}"
+                               min="0"
+                               max="9999"
+                               required>
+                        <div class="form-text">Время отдыха между подходами в секундах</div>
+                    </div>
+
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{{ url_for('index') }}" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> Назад
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-circle"></i> Сохранить настройки
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        {% if prefs %}
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="mb-0">Информация</h6>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">
+                    Настройки сохранены в базе данных. Эти значения будут использоваться при создании новых упражнений.
+                </p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

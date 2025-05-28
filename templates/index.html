@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}Главная - Домашние тренировки{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body text-center">
+                <h5 class="card-title">Приложение для домашних тренировок</h5>
+                <p class="card-text">
+                    Создавайте комплексы упражнений, выполняйте тренировки и отслеживайте прогресс.
+                </p>
+                <div class="row mt-4">
+                    <div class="col-md-4 mb-3">
+                        <a href="{{ url_for('workout_sets_list') }}" class="text-decoration-none">
+                            <div class="card h-100 card-hover">
+                                <div class="card-body">
+                                    <h6 class="card-title">📋 Комплексы</h6>
+                                    <p class="card-text">Создавайте и управляйте комплексами упражнений</p>
+                                </div>
+                            </div>
+                        </a>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h6 class="card-title">📊 Статистика</h6>
+                                <p class="card-text">Отслеживайте выполненные тренировки</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <a href="{{ url_for('settings') }}" class="text-decoration-none">
+                            <div class="card h-100 card-hover">
+                                <div class="card-body">
+                                    <h6 class="card-title">⚙️ Настройки</h6>
+                                    <p class="card-text">Настройте значения по умолчанию для упражнений</p>
+                                </div>
+                            </div>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
