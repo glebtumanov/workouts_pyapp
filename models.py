@@ -310,3 +310,61 @@ class WorkoutSetModel:
                 SELECT COUNT(*) FROM exercises WHERE workoutset_code = ?
             ''', (code,))
             return cursor.fetchone()[0]
+
+
+class WorkoutLogModel:
+    """Модель для работы с журналом тренировок."""
+
+    @staticmethod
+    def get_all() -> List[Dict[str, Any]]:
+        """Получает все записи журнала тренировок."""
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT wl.code, wl.date, wl.workoutset_code, wl.duration_seconds,
+                       ws.name as workoutset_name
+                FROM workout_logs wl
+                LEFT JOIN workout_sets ws ON wl.workoutset_code = ws.code
+                ORDER BY wl.date DESC
+            ''')
+            return [dict(row) for row in cursor.fetchall()]
+
+    @staticmethod
+    def get_last_workout_for_set(workoutset_code: str) -> Optional[Dict[str, Any]]:
+        """Получает последнюю тренировку для указанного комплекса."""
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT code, date, workoutset_code, duration_seconds
+                FROM workout_logs
+                WHERE workoutset_code = ?
+                ORDER BY date DESC
+                LIMIT 1
+            ''', (workoutset_code,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+
+    @staticmethod
+    def create(workoutset_code: str, duration_seconds: int, workout_date: str = None) -> str:
+        """Создает новую запись в журнале тренировок."""
+        code = str(uuid4())
+        if workout_date is None:
+            workout_date = datetime.now().isoformat()
+
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO workout_logs (code, date, workoutset_code, duration_seconds)
+                VALUES (?, ?, ?, ?)
+            ''', (code, workout_date, workoutset_code, duration_seconds))
+            conn.commit()
+        return code
+
+    @staticmethod
+    def delete(code: str) -> bool:
+        """Удаляет запись из журнала тренировок."""
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('DELETE FROM workout_logs WHERE code = ?', (code,))
+            conn.commit()
+            return cursor.rowcount > 0

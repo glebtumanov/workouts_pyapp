@@ -2,7 +2,7 @@ from flask import Flask, render_template, request, redirect, url_for, flash, jso
 from werkzeug.utils import secure_filename
 import os
 import json
-from models import WorkoutSetModel, ExerciseModel, UserPrefsModel
+from models import WorkoutSetModel, ExerciseModel, UserPrefsModel, WorkoutLogModel
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'dev-secret-key-change-in-production'
@@ -43,6 +43,34 @@ def workout_sets_list():
 
         workout_set['total_rounds'] = total_rounds
         workout_set['estimated_duration'] = estimated_duration
+
+        # Получаем информацию о последней тренировке
+        last_workout = WorkoutLogModel.get_last_workout_for_set(workout_set['code'])
+        if last_workout:
+            from datetime import datetime, timezone
+
+            # Парсим дату последней тренировки
+            try:
+                last_date = datetime.fromisoformat(last_workout['date'].replace('Z', '+00:00'))
+                now = datetime.now(timezone.utc)
+
+                # Если время последней тренировки в UTC, конвертируем текущее время
+                if last_date.tzinfo is None:
+                    last_date = last_date.replace(tzinfo=timezone.utc)
+                    now = datetime.now(timezone.utc)
+                else:
+                    now = datetime.now(timezone.utc)
+
+                days_ago = (now - last_date).days
+                workout_set['last_workout_days_ago'] = days_ago
+                workout_set['last_workout_date'] = last_workout['date']
+            except Exception as e:
+                print(f"Ошибка при обработке даты тренировки: {e}")
+                workout_set['last_workout_days_ago'] = None
+                workout_set['last_workout_date'] = None
+        else:
+            workout_set['last_workout_days_ago'] = None
+            workout_set['last_workout_date'] = None
 
     return render_template('workout_sets/list.html', workout_sets=workout_sets)
 

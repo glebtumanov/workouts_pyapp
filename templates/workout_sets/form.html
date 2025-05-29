@@ -45,7 +45,7 @@
                     {% if workout_set and workout_set.code %}
                     <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-3 pt-3 border-top">
                         <a href="{{ url_for('workout_sets_list') }}" class="btn btn-secondary">
-                            <i class="bi bi-arrow-left"></i> Отмена
+                            <i class="bi bi-arrow-left"></i> Назад
                         </a>
                         <button type="submit" class="btn btn-primary" onclick="console.log('Клик по кнопке Сохранить напрямую');">
                             <i class="bi bi-check-circle"></i> Сохранить
@@ -140,7 +140,7 @@
             <div class="card-body">
                 <div class="d-grid gap-2 d-md-flex justify-content-md-end">
                     <a href="{{ url_for('workout_sets_list') }}" class="btn btn-secondary">
-                        <i class="bi bi-arrow-left"></i> Отмена
+                        <i class="bi bi-arrow-left"></i> Назад
                     </a>
                     <button type="submit" class="btn btn-primary">
                         <i class="bi bi-check-circle"></i> Создать комплекс

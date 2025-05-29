@@ -3,7 +3,9 @@
 Скрипт для создания тестовых данных в приложении тренировок.
 """
 
-from models import WorkoutSetModel, ExerciseModel
+from models import WorkoutSetModel, ExerciseModel, UserPrefsModel, WorkoutLogModel
+from datetime import datetime, timedelta
+import random
 
 def create_test_exercises(workoutset_code, exercises_data):
     """Создает тестовые упражнения для комплекса."""
@@ -175,35 +177,57 @@ def create_test_workout_sets():
 
     return created_codes
 
+def create_test_workout_logs():
+    """Создает тестовые записи в журнале тренировок."""
+    print("Создание тестовых записей в журнале тренировок...")
+
+    # Получаем все существующие комплексы
+    workout_sets = WorkoutSetModel.get_all()
+    if not workout_sets:
+        print("Нет комплексов для создания тренировок. Сначала создайте комплексы.")
+        return
+
+    # Создаем записи тренировок за последние 30 дней
+    base_date = datetime.now()
+
+    for workout_set in workout_sets:
+        # Создаем 3-7 записей для каждого комплекса
+        num_workouts = random.randint(3, 7)
+
+        for i in range(num_workouts):
+            # Случайная дата в последние 30 дней
+            days_ago = random.randint(1, 30)
+            workout_date = (base_date - timedelta(days=days_ago)).isoformat()
+
+            # Случайная продолжительность тренировки (20-90 минут)
+            duration_minutes = random.randint(20, 90)
+            duration_seconds = duration_minutes * 60
+
+            try:
+                workout_log_code = WorkoutLogModel.create(
+                    workoutset_code=workout_set['code'],
+                    duration_seconds=duration_seconds,
+                    workout_date=workout_date
+                )
+                print(f"  ✓ Тренировка {workout_set['name']}: {duration_minutes} мин, {days_ago} дней назад")
+            except Exception as e:
+                print(f"  ✗ Ошибка создания тренировки для {workout_set['name']}: {e}")
+
+    print("Тестовые записи тренировок созданы!")
+
+def create_all_test_data():
+    """Создает все тестовые данные включая журнал тренировок."""
+    # Сначала создаем все остальные данные
+    create_test_workout_sets()
+
+    # Затем создаем тестовые записи тренировок
+    create_test_workout_logs()
+
 def main():
     """Основная функция."""
     print("Создание тестовых данных...")
-
-    # Проверяем существующие комплексы
-    existing_sets = WorkoutSetModel.get_all()
-    if existing_sets:
-        print(f"В БД уже есть {len(existing_sets)} комплексов")
-        response = input("Создать дополнительные тестовые комплексы? (y/n): ")
-        if response.lower() != 'y':
-            print("Отменено")
-            return
-
-        # Удаляем старые тестовые данные
-        confirm = input("Удалить существующие комплексы перед созданием новых? (y/n): ")
-        if confirm.lower() == 'y':
-            for workout_set in existing_sets:
-                try:
-                    ExerciseModel.delete_by_workoutset(workout_set['code'])
-                    WorkoutSetModel.delete(workout_set['code'])
-                    print(f"✓ Удален комплекс: {workout_set['name']}")
-                except Exception as e:
-                    print(f"❌ Ошибка при удалении комплекса {workout_set['name']}: {e}")
-
-    # Создаем тестовые комплексы
-    created_codes = create_test_workout_sets()
-
-    print(f"\n🎉 Создано {len(created_codes)} тестовых комплексов с упражнениями")
-    print("\nВы можете открыть приложение по адресу: http://localhost:5000")
+    create_all_test_data()
+    print("Готово!")
 
 if __name__ == '__main__':
     main()

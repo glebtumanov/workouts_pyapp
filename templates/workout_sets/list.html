@@ -24,6 +24,34 @@
                                 {% endif %}
                             </div>
                             <div class="card-footer bg-transparent">
+                                <!-- Информационная строка -->
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <div class="d-flex align-items-center me-4">
+                                        <small class="text-muted me-2">Упражнений:</small>
+                                        <span class="fw-bold text-primary">{{ workout_set.exercise_count }}</span>
+                                    </div>
+                                    <div class="d-flex align-items-center">
+                                        {% if workout_set.last_workout_days_ago is not none %}
+                                            {% if workout_set.last_workout_days_ago <= 2 %}
+                                                {% if workout_set.last_workout_days_ago == 0 %}
+                                                    <span class="fw-bold text-success">Сегодня</span>
+                                                {% elif workout_set.last_workout_days_ago == 1 %}
+                                                    <span class="fw-bold text-success">Вчера</span>
+                                                {% else %}
+                                                    <span class="fw-bold text-success">{{ workout_set.last_workout_days_ago }} дн. назад</span>
+                                                {% endif %}
+                                            {% elif workout_set.last_workout_days_ago <= 7 %}
+                                                <span class="fw-bold text-warning">{{ workout_set.last_workout_days_ago }} дн. назад</span>
+                                            {% else %}
+                                                <span class="fw-bold text-danger">{{ workout_set.last_workout_days_ago }} дн. назад</span>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="fw-bold text-muted">Никогда</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card-footer bg-transparent">
                                 <div class="btn-group w-100" role="group">
                                     <a href="#" class="btn btn-success btn-sm">
                                         <i class="bi bi-play-circle"></i> Начать тренировку
