@@ -172,3 +172,8 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# Application specific files
+backups/
+*.db.backup_*
+workout_app.db

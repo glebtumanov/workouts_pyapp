@@ -72,6 +72,7 @@ def create_workout_log_table(cursor):
             date TIMESTAMP NOT NULL,
             workoutset_code TEXT NOT NULL,
             duration_seconds INTEGER NOT NULL,
+            completed_exercises TEXT,  -- JSON массив завершенных упражнений
             FOREIGN KEY (workoutset_code) REFERENCES workout_sets (code)
         )
     ''')
@@ -185,12 +186,14 @@ def show_help():
 Использование: python make_db.py [опции]
 
 Опции:
-  --force, -f    Пересоздать базу данных (удалить существующую)
-  --help, -h     Показать эту справку
+  --force, -f     Пересоздать базу данных (удалить существующую)
+  --migrate, -m   Выполнить миграцию базы данных (добавить новые поля)
+  --help, -h      Показать эту справку
 
 Примеры:
   python make_db.py           # Создать БД (если не существует)
   python make_db.py --force   # Пересоздать БД с нуля
+  python make_db.py --migrate # Обновить существующую БД
     """)
 
 
@@ -203,12 +206,49 @@ def main():
         return
 
     force_recreate = '--force' in args or '-f' in args
+    migrate = '--migrate' in args or '-m' in args
 
     try:
-        create_database(force_recreate=force_recreate)
+        if migrate:
+            migrate_database()
+        else:
+            create_database(force_recreate=force_recreate)
     except Exception as e:
         print(f"❌ Критическая ошибка: {e}")
         sys.exit(1)
+
+
+def migrate_database():
+    """Выполняет миграцию базы данных для добавления новых полей."""
+    db_path = get_db_path()
+
+    if not os.path.exists(db_path):
+        print("База данных не существует. Создаем новую...")
+        create_database()
+        return
+
+    try:
+        with sqlite3.connect(db_path) as conn:
+            cursor = conn.cursor()
+
+            # Проверяем, есть ли уже поле completed_exercises в таблице workout_logs
+            cursor.execute("PRAGMA table_info(workout_logs)")
+            columns = [column[1] for column in cursor.fetchall()]
+
+            if 'completed_exercises' not in columns:
+                print("Добавляем поле completed_exercises в таблицу workout_logs...")
+                cursor.execute('''
+                    ALTER TABLE workout_logs
+                    ADD COLUMN completed_exercises TEXT
+                ''')
+                conn.commit()
+                print("✓ Поле completed_exercises успешно добавлено")
+            else:
+                print("✓ Поле completed_exercises уже существует")
+
+    except sqlite3.Error as e:
+        print(f"❌ Ошибка при миграции базы данных: {e}")
+        raise
 
 
 if __name__ == '__main__':

@@ -325,13 +325,7 @@ document.addEventListener('DOMContentLoaded', function() {
         bindImagePreview(exerciseForm);
     });
 
-    // Отмена добавления упражнения
-    cancelExerciseBtn.addEventListener('click', function() {
-        hideNewExerciseForm();
-        clearExerciseForm();
-    });
-
-        // Сохранение упражнения
+    // Сохранение упражнения
     saveExerciseBtn.addEventListener('click', function() {
         const exerciseForm = newExerciseForm.querySelector('.exercise-form');
         const name = exerciseForm.querySelector('.exercise-name').value.trim();
@@ -341,8 +335,25 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        // Создаем упражнение через AJAX
-        createExercise(exerciseForm);
+        // Проверяем режим работы формы
+        if (newExerciseForm.dataset.editMode === 'true') {
+            // Режим редактирования
+            const exerciseCode = newExerciseForm.dataset.editCode;
+            const exerciseIndex = parseInt(newExerciseForm.dataset.editIndex);
+            const cardIndex = newExerciseForm.dataset.editCard;
+            const card = exercisesList.querySelector(`[data-exercise-index="${cardIndex}"]`);
+
+            updateExercise(exerciseCode, exerciseIndex, card, exerciseForm);
+        } else {
+            // Режим создания
+            createExercise(exerciseForm);
+        }
+    });
+
+    // Отмена добавления упражнения
+    cancelExerciseBtn.addEventListener('click', function() {
+        // Сбрасываем режим редактирования
+        resetToAddMode();
     });
 
     // Скрыть форму добавления упражнения
@@ -375,6 +386,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const previewField = exerciseForm.querySelector('.image-preview');
         const existingImagesContainer = exerciseForm.querySelector('.existing-images-container');
         const deletedImagesInput = exerciseForm.querySelector('.deleted-images');
+        const exerciseCodeInput = exerciseForm.querySelector('.exercise-code');
 
         if (nameField) nameField.value = '';
         if (descField) descField.value = '';
@@ -394,6 +406,17 @@ document.addEventListener('DOMContentLoaded', function() {
         if (previewField) previewField.innerHTML = '';
         if (existingImagesContainer) existingImagesContainer.remove();
         if (deletedImagesInput) deletedImagesInput.remove();
+        if (exerciseCodeInput) exerciseCodeInput.remove();
+    }
+
+    // Функция для сброса формы в режим добавления
+    function resetFormToAddMode() {
+        if (newExerciseForm) {
+            delete newExerciseForm.dataset.editMode;
+            delete newExerciseForm.dataset.editIndex;
+            delete newExerciseForm.dataset.editCode;
+            delete newExerciseForm.dataset.editCard;
+        }
     }
 
     // Собрать данные упражнения из формы
@@ -505,44 +528,9 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        const deleteBtn = card.querySelector('.delete-exercise-btn');
-        const editBtn = card.querySelector('.edit-exercise-btn');
-
-        if (deleteBtn) {
-            deleteBtn.addEventListener('click', function() {
-                const exerciseIndex = parseInt(this.dataset.exerciseIndex);
-                if (isNaN(exerciseIndex) || exerciseIndex < 0 || exerciseIndex >= exercises.length) {
-                    console.error('Invalid exercise index:', exerciseIndex);
-                    return;
-                }
-
-                const exerciseData = exercises[exerciseIndex];
-                if (!exerciseData || !exerciseData.code) {
-                    console.error('Exercise data not found or missing code');
-                    return;
-                }
-
-                deleteExercise(exerciseData.code, exerciseIndex, card);
-            });
-        }
-
-        if (editBtn) {
-            editBtn.addEventListener('click', function() {
-                const exerciseIndex = parseInt(this.dataset.exerciseIndex);
-                if (isNaN(exerciseIndex) || exerciseIndex < 0 || exerciseIndex >= exercises.length) {
-                    console.error('Invalid exercise index:', exerciseIndex);
-                    return;
-                }
-
-                const exerciseData = exercises[exerciseIndex];
-                if (!exerciseData) {
-                    console.error('Exercise data not found');
-                    return;
-                }
-
-                editExercise(exerciseData, exerciseIndex, card);
-            });
-        }
+        // События теперь обрабатываются через делегирование в exercisesList
+        // Эта функция остается для совместимости, но больше ничего не делает
+        console.log('Карточка упражнения готова (используется делегирование событий)');
     }
 
     // Удаление файлов изображений упражнения
@@ -557,8 +545,12 @@ document.addEventListener('DOMContentLoaded', function() {
         exercisesList.querySelectorAll('.exercise-card').forEach((card, index) => {
             card.dataset.exerciseIndex = index;
             const deleteBtn = card.querySelector('.delete-exercise-btn');
+            const editBtn = card.querySelector('.edit-exercise-btn');
             if (deleteBtn) {
                 deleteBtn.dataset.exerciseIndex = index;
+            }
+            if (editBtn) {
+                editBtn.dataset.exerciseIndex = index;
             }
         });
     }
@@ -820,6 +812,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Очищаем форму
                 hideNewExerciseForm();
                 clearExerciseForm();
+                resetFormToAddMode();
             } else {
                 alert('Ошибка при создании упражнения: ' + data.message);
             }
@@ -936,6 +929,12 @@ document.addEventListener('DOMContentLoaded', function() {
         exerciseForm.querySelector('.round-count').value = exerciseData.round_count || defaultValues.round_count;
         exerciseForm.querySelector('.rest-seconds').value = exerciseData.rest_seconds || defaultValues.rest_seconds;
 
+        // Опциональные поля
+        const descField = exerciseForm.querySelector('.exercise-description');
+        const videoField = exerciseForm.querySelector('.exercise-video-url');
+        if (descField) descField.value = exerciseData.description || '';
+        if (videoField) videoField.value = exerciseData.video_url || '';
+
         // Устанавливаем код упражнения в скрытое поле
         let exerciseCodeInput = exerciseForm.querySelector('.exercise-code');
         if (!exerciseCodeInput) {
@@ -955,26 +954,11 @@ document.addEventListener('DOMContentLoaded', function() {
         // Привязываем обработчики для превью новых изображений
         bindImagePreview(exerciseForm);
 
-        // Меняем обработчики кнопок для режима редактирования
-        const saveBtn = document.getElementById('saveExerciseBtn');
-        const cancelBtn = document.getElementById('cancelExerciseBtn');
-
-        // Сохраняем оригинальные обработчики
-        const originalSaveHandler = saveBtn.cloneNode(true);
-        const originalCancelHandler = cancelBtn.cloneNode(true);
-
-        // Заменяем кнопки
-        saveBtn.parentNode.replaceChild(originalSaveHandler, saveBtn);
-        cancelBtn.parentNode.replaceChild(originalCancelHandler, cancelBtn);
-
-        // Новые обработчики для редактирования
-        originalSaveHandler.addEventListener('click', function() {
-            updateExercise(exerciseData.code, exerciseIndex, card, exerciseForm);
-        });
-
-        originalCancelHandler.addEventListener('click', function() {
-            cancelEdit(originalSaveHandler, originalCancelHandler);
-        });
+        // Помечаем форму как находящуюся в режиме редактирования
+        newExerciseForm.dataset.editMode = 'true';
+        newExerciseForm.dataset.editIndex = exerciseIndex;
+        newExerciseForm.dataset.editCode = exerciseData.code;
+        newExerciseForm.dataset.editCard = card.dataset.exerciseIndex; // Используем индекс карточки
 
         // Фокус на название
         exerciseForm.querySelector('.exercise-name').focus();
@@ -1053,6 +1037,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     console.error('Updated card element is null');
                 }
 
+                // Обновляем все индексы упражнений
+                updateExerciseIndices();
+
                 // Возвращаемся к режиму добавления
                 resetToAddMode();
             } else {
@@ -1065,57 +1052,11 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Функция для отмены редактирования
-    function cancelEdit(saveBtn, cancelBtn) {
-        // Восстанавливаем оригинальные обработчики
-        resetToAddMode();
-    }
-
     // Функция для возврата к режиму добавления
     function resetToAddMode() {
         hideNewExerciseForm();
         clearExerciseForm();
-
-        // Восстанавливаем оригинальные обработчики кнопок без перезагрузки страницы
-        const saveBtn = document.getElementById('saveExerciseBtn');
-        const cancelBtn = document.getElementById('cancelExerciseBtn');
-
-        if (saveBtn && cancelBtn) {
-            // Удаляем старые обработчики
-            const newSaveBtn = saveBtn.cloneNode(true);
-            const newCancelBtn = cancelBtn.cloneNode(true);
-
-            saveBtn.parentNode.replaceChild(newSaveBtn, saveBtn);
-            cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
-
-            // Восстанавливаем оригинальные обработчики
-            newSaveBtn.addEventListener('click', function() {
-                const exerciseForm = newExerciseForm.querySelector('.exercise-form');
-                const name = exerciseForm.querySelector('.exercise-name').value.trim();
-
-                if (!name) {
-                    alert('Пожалуйста, введите название упражнения');
-                    return;
-                }
-
-                // Создаем упражнение через AJAX
-                createExercise(exerciseForm);
-            });
-
-            newCancelBtn.addEventListener('click', function() {
-                hideNewExerciseForm();
-                clearExerciseForm();
-            });
-        }
-    }
-
-    // Привязываем события к существующим карточкам
-    if (exercisesList) {
-        exercisesList.querySelectorAll('.exercise-card').forEach(card => {
-            if (card) {
-                bindExerciseCardEvents(card);
-            }
-        });
+        resetFormToAddMode();
     }
 
     // Универсальный обработчик для кнопок переключения изображений через делегирование
@@ -1132,6 +1073,55 @@ document.addEventListener('DOMContentLoaded', function() {
             e.target.textContent = isHidden ? 'Скрыть' : 'Показать';
         }
     });
+
+    // Делегирование событий для кнопок редактирования и удаления упражнений
+    if (exercisesList) {
+        exercisesList.addEventListener('click', function(e) {
+            // Обработка кнопки редактирования
+            if (e.target.closest('.edit-exercise-btn')) {
+                const btn = e.target.closest('.edit-exercise-btn');
+                const exerciseIndex = parseInt(btn.dataset.exerciseIndex);
+
+                console.log('Клик по кнопке редактирования, индекс:', exerciseIndex);
+
+                if (isNaN(exerciseIndex) || exerciseIndex < 0 || exerciseIndex >= exercises.length) {
+                    console.error('Invalid exercise index:', exerciseIndex);
+                    return;
+                }
+
+                const exerciseData = exercises[exerciseIndex];
+                if (!exerciseData) {
+                    console.error('Exercise data not found');
+                    return;
+                }
+
+                const card = btn.closest('.exercise-card');
+                editExercise(exerciseData, exerciseIndex, card);
+            }
+
+            // Обработка кнопки удаления
+            if (e.target.closest('.delete-exercise-btn')) {
+                const btn = e.target.closest('.delete-exercise-btn');
+                const exerciseIndex = parseInt(btn.dataset.exerciseIndex);
+
+                console.log('Клик по кнопке удаления, индекс:', exerciseIndex);
+
+                if (isNaN(exerciseIndex) || exerciseIndex < 0 || exerciseIndex >= exercises.length) {
+                    console.error('Invalid exercise index:', exerciseIndex);
+                    return;
+                }
+
+                const exerciseData = exercises[exerciseIndex];
+                if (!exerciseData || !exerciseData.code) {
+                    console.error('Exercise data not found or missing code');
+                    return;
+                }
+
+                const card = btn.closest('.exercise-card');
+                deleteExercise(exerciseData.code, exerciseIndex, card);
+            }
+        });
+    }
 });
 </script>
 {% endblock %}

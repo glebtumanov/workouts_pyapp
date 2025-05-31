@@ -1,0 +1,231 @@
+{% extends "base.html" %}
+
+{% block title %}Статистика тренировок - Домашние тренировки{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2>Статистика тренировок</h2>
+            <div>
+                {% if workout_logs %}
+                    <button type="button" class="btn btn-outline-danger me-2" data-bs-toggle="modal" data-bs-target="#clearAllModal">
+                        <i class="bi bi-trash"></i> Очистить всё
+                    </button>
+                {% endif %}
+                <a href="{{ url_for('workout_sets_list') }}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i> К комплексам
+                </a>
+            </div>
+        </div>
+
+        {% if workout_logs %}
+            <!-- Краткая статистика -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h5 class="card-title text-primary">
+                                <i class="bi bi-trophy"></i>
+                                Тренировок за месяц
+                            </h5>
+                            <h3 class="text-primary">{{ recent_logs|length }}</h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h5 class="card-title text-success">
+                                <i class="bi bi-clock"></i>
+                                Время за месяц
+                            </h5>
+                            {% if recent_logs %}
+                                {% set total_time = recent_logs|sum(attribute='duration_seconds') %}
+                                {% set total_hours = (total_time // 3600) %}
+                                {% set total_minutes = ((total_time % 3600) // 60) %}
+                                <h3 class="text-success">
+                                    {% if total_hours > 0 %}
+                                        {{ total_hours }}ч {{ total_minutes }}м
+                                    {% else %}
+                                        {{ total_minutes }}м
+                                    {% endif %}
+                                </h3>
+                            {% else %}
+                                <h3 class="text-muted">0м</h3>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h5 class="card-title text-info">
+                                <i class="bi bi-graph-up"></i>
+                                Среднее время
+                            </h5>
+                            {% if recent_logs %}
+                                {% set avg_time = (recent_logs|sum(attribute='duration_seconds') / recent_logs|length)|int %}
+                                {% set avg_minutes = (avg_time // 60) %}
+                                {% set avg_seconds = (avg_time % 60) %}
+                                <h3 class="text-info">{{ avg_minutes }}:{{ "%02d"|format(avg_seconds) }}</h3>
+                            {% else %}
+                                <h3 class="text-muted">-</h3>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h5 class="card-title text-warning">
+                                <i class="bi bi-check-circle"></i>
+                                Средн. завершение
+                            </h5>
+                            {% set logs_with_completion = [] %}
+                            {% for log in recent_logs %}
+                                {% if log.completion_percentage is defined and log.completion_percentage is not none %}
+                                    {% set _ = logs_with_completion.append(log.completion_percentage) %}
+                                {% endif %}
+                            {% endfor %}
+                            {% if logs_with_completion %}
+                                {% set avg_completion = (logs_with_completion|sum / logs_with_completion|length)|round|int %}
+                                <h3 class="text-warning">{{ avg_completion }}%</h3>
+                            {% else %}
+                                <h3 class="text-muted">-</h3>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Таблица тренировок -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-table"></i>
+                        История тренировок
+                    </h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Дата</th>
+                                    <th>День недели</th>
+                                    <th>Время</th>
+                                    <th>Комплекс</th>
+                                    <th>Длительность</th>
+                                    <th>Завершено</th>
+                                    <th width="80">Действия</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for log in workout_logs %}
+                                    <tr>
+                                        <td>
+                                            <span class="fw-medium">{{ log.formatted_date }}</span>
+                                        </td>
+                                        <td>
+                                            {{ log.weekday }}
+                                        </td>
+                                        <td>
+                                            <small class="text-muted">{{ log.formatted_time }}</small>
+                                        </td>
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                <i class="bi bi-dumbbell text-primary me-2"></i>
+                                                <span>
+                                                    {% if log.workoutset_name %}
+                                                        {{ log.workoutset_name }}
+                                                    {% else %}
+                                                        <em class="text-muted">Комплекс удален</em>
+                                                    {% endif %}
+                                                </span>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            {{ log.formatted_duration }}
+                                        </td>
+                                        <td>
+                                            {% if log.completion_percentage is defined and log.completion_percentage is not none %}
+                                                {% if log.completion_percentage == 100 %}
+                                                    <span class="text-success fw-medium">{{ log.completion_percentage }}%</span>
+                                                {% elif log.completion_percentage >= 75 %}
+                                                    <span class="text-warning fw-medium">{{ log.completion_percentage }}%</span>
+                                                {% elif log.completion_percentage >= 50 %}
+                                                    <span class="text-info fw-medium">{{ log.completion_percentage }}%</span>
+                                                {% else %}
+                                                    <span class="text-secondary fw-medium">{{ log.completion_percentage }}%</span>
+                                                {% endif %}
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <form method="POST" action="{{ url_for('statistics_log_delete', code=log.code) }}" class="d-inline">
+                                                <button type="submit" class="btn btn-outline-danger btn-sm"
+                                                        onclick="return confirm('Удалить эту запись из журнала тренировок?')"
+                                                        title="Удалить запись">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        {% else %}
+            <!-- Пустое состояние -->
+            <div class="text-center py-5">
+                <i class="bi bi-graph-down fs-1 text-muted mb-3"></i>
+                <h4 class="text-muted">Тренировки не найдены</h4>
+                <p class="text-muted">Выполните свою первую тренировку, чтобы увидеть статистику</p>
+                <a href="{{ url_for('workout_sets_list') }}" class="btn btn-primary">
+                    <i class="bi bi-play-circle"></i> Начать тренировку
+                </a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Модальное окно подтверждения полной очистки -->
+<div class="modal fade" id="clearAllModal" tabindex="-1" aria-labelledby="clearAllModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="clearAllModalLabel">
+                    <i class="bi bi-exclamation-triangle text-warning"></i>
+                    Подтверждение очистки
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+            </div>
+            <div class="modal-body">
+                <p>Вы действительно хотите <strong>полностью очистить</strong> журнал тренировок?</p>
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    <strong>Внимание!</strong> Это действие нельзя отменить. Все записи о тренировках будут безвозвратно удалены.
+                </div>
+                {% if workout_logs %}
+                    <p class="text-muted">Будет удалено записей: <strong>{{ workout_logs|length }}</strong></p>
+                {% endif %}
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle"></i> Отмена
+                </button>
+                <form method="POST" action="{{ url_for('statistics_clear_all') }}" class="d-inline">
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-trash"></i> Да, очистить всё
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

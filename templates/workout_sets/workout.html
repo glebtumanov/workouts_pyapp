@@ -1,0 +1,882 @@
+{% extends "base.html" %}
+
+{% block title %}Тренировка: {{ workout_set.name }} - Домашние тренировки{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <!-- Заголовок тренировки -->
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2>{{ workout_set.name }}</h2>
+            <div class="d-flex align-items-center">
+                <span class="text-muted me-3" id="totalTime">Общее время: 00:00</span>
+                <a href="{{ url_for('workout_sets_list') }}" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-arrow-left"></i> Назад к списку
+                </a>
+            </div>
+        </div>
+
+        <!-- Информационная панель текущего упражнения -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card border-primary" id="currentExercisePanel" style="display: none;">
+                    <div class="card-body">
+                        <div class="row align-items-start">
+                            <div class="col-md-6">
+                                <h5 class="text-primary mb-2">
+                                    <i class="bi bi-play-circle-fill me-2"></i>
+                                    <span id="currentExerciseInstruction">Выполните упражнение</span>
+                                </h5>
+                                <h4 class="mb-0" id="currentExerciseName">Название упражнения</h4>
+                                <p class="text-muted mb-0">
+                                    <span id="currentExerciseReps">15</span> повторений
+                                </p>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="d-flex justify-content-end" id="currentExerciseImages">
+                                    <!-- Изображения будут добавлены динамически -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Таймер обратного отсчета -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card border-warning" id="timerCard" style="display: none;">
+                    <div class="card-body text-center">
+                        <h3 class="text-warning mb-2">Отдых</h3>
+                        <div class="display-1 fw-bold text-warning" id="timerDisplay">00:00</div>
+                        <p class="text-muted mb-0" id="timerExerciseName"></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Упражнения -->
+        <div class="row" id="exercisesContainer">
+            {% for exercise in exercises %}
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card h-100 exercise-card"
+                         data-exercise-code="{{ exercise.code }}"
+                         data-exercise-index="{{ loop.index0 }}"
+                         data-round-count="{{ exercise.round_count }}"
+                         data-rest-seconds="{{ exercise.rest_seconds }}"
+                         data-exercise-name="{{ exercise.name }}"
+                         data-repeat-count="{{ exercise.repeat_count }}"
+                         data-exercise-images='{{ exercise.images | tojson }}'>
+
+                        <!-- Индикатор активного упражнения -->
+                        <div class="card-header bg-primary text-white text-center fw-bold exercise-header"
+                             style="display: none;">
+                            Текущее упражнение
+                        </div>
+
+                        <div class="card-body">
+                            <h6 class="card-title d-flex align-items-center">
+                                <i class="bi bi-dumbbell me-2"></i>
+                                {{ exercise.name }}
+                            </h6>
+
+                            <!-- Параметры упражнения -->
+                            <div class="mb-3">
+                                <span class="badge bg-info me-1">{{ exercise.round_count }} подходов</span>
+                                <span class="badge bg-success me-1">{{ exercise.repeat_count }} раз</span>
+                                <span class="badge bg-warning">{{ exercise.rest_seconds }}с отдых</span>
+                            </div>
+
+                            <!-- Миниатюры изображений -->
+                            {% if exercise.images %}
+                                <div class="exercise-images mb-3">
+                                    {% for image in exercise.images[:2] %}
+                                        <img src="{{ url_for('static', filename=image) }}"
+                                             class="img-thumbnail me-1"
+                                             style="width: 60px; height: 60px; object-fit: cover;"
+                                             alt="Упражнение">
+                                    {% endfor %}
+                                    {% if exercise.images|length > 2 %}
+                                        <span class="text-muted small">+{{ exercise.images|length - 2 }}</span>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+
+                            <!-- Описание упражнения -->
+                            {% if exercise.description %}
+                                <p class="card-text small text-muted">{{ exercise.description[:100] }}{% if exercise.description|length > 100 %}...{% endif %}</p>
+                            {% endif %}
+                        </div>
+
+                        <div class="card-footer">
+                            <!-- Прогресс подходов -->
+                            <div class="mb-2">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <small class="text-muted">Прогресс:</small>
+                                    <small class="text-muted">
+                                        <span class="current-round">0</span> / {{ exercise.round_count }}
+                                    </small>
+                                </div>
+                                <div class="progress" style="height: 8px;">
+                                    <div class="progress-bar bg-success progress-rounds"
+                                         role="progressbar"
+                                         style="width: 0%"
+                                         aria-valuemin="0"
+                                         aria-valuemax="{{ exercise.round_count }}">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Отметки выполненных подходов -->
+                            <div class="rounds-checkmarks mb-2">
+                                {% for i in range(exercise.round_count) %}
+                                    <i class="bi bi-circle round-check" data-round="{{ i + 1 }}"></i>
+                                {% endfor %}
+                            </div>
+
+                            <!-- Кнопка отдыха -->
+                            <button class="btn btn-warning w-100 rest-button"
+                                    data-exercise-code="{{ exercise.code }}"
+                                    style="display: none;"
+                                    disabled>
+                                <i class="bi bi-pause-circle"></i> Отдых
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+
+        <!-- Кнопка завершения тренировки -->
+        <div class="row mb-4">
+            <div class="col-12 text-center">
+                <button class="btn btn-danger btn-lg" id="finishWorkoutBtn">
+                    <i class="bi bi-stop-circle"></i> Закончить тренировку
+                </button>
+            </div>
+        </div>
+
+        <!-- Модальное окно завершения тренировки -->
+        <div class="modal fade" id="completeModal" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header bg-success text-white">
+                        <h5 class="modal-title">
+                            <i class="bi bi-trophy-fill me-2"></i>
+                            Поздравляем!
+                        </h5>
+                    </div>
+                    <div class="modal-body text-center">
+                        <div class="mb-3">
+                            <i class="bi bi-check-circle-fill text-success" style="font-size: 3rem;"></i>
+                        </div>
+                        <h4>Тренировка завершена!</h4>
+                        <p class="text-muted">Время выполнения: <span id="finalTime"></span></p>
+                        <p class="text-muted">Комплекс: {{ workout_set.name }}</p>
+                    </div>
+                    <div class="modal-footer justify-content-center">
+                        <a href="{{ url_for('workout_sets_list') }}" class="btn btn-primary">
+                            <i class="bi bi-arrow-left"></i> К списку комплексов
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Подключаем звуковой модуль -->
+<script src="{{ url_for('static', filename='js/notification-sound.js') }}"></script>
+
+<script>
+class WorkoutSession {
+    constructor(exercises) {
+        console.log('🔥 Конструктор WorkoutSession вызван с упражнениями:', exercises);
+
+        this.exercises = exercises;
+        this.workoutSetCode = '{{ workout_set.code }}';
+        this.workoutSetName = '{{ workout_set.name }}';
+        this.currentExerciseIndex = 0;
+        this.currentRound = 0;
+        this.isResting = false;
+        this.startTime = Date.now();
+        this.timerInterval = null;
+        this.restEndTime = null;
+        this.completedRounds = {}; // Сохраняем выполненные подходы для каждого упражнения
+        this.isWorkoutFinished = false; // Флаг завершения тренировки
+
+        console.log('🔥 Инициализируем звуковые уведомления...');
+        // Инициализируем звуковые уведомления
+        this.notificationSound = new NotificationSound();
+        this.notificationSound.requestNotificationPermission();
+
+        console.log('🔥 Вызываем initializeUI...');
+        this.initializeUI();
+        console.log('🔥 Вызываем loadWorkoutState...');
+        this.loadWorkoutState(); // Загружаем сохраненное состояние
+        console.log('🔥 Вызываем updateTotalTime...');
+        this.updateTotalTime();
+
+        console.log('🔥 WorkoutSession полностью инициализирован');
+    }
+
+    saveWorkoutState() {
+        // Не сохраняем состояние если тренировка завершена
+        if (this.isWorkoutFinished) {
+            console.log('🔥 Тренировка завершена, НЕ сохраняем состояние');
+            return;
+        }
+
+        const state = {
+            workoutSetCode: this.workoutSetCode,
+            workoutSetName: this.workoutSetName,
+            currentExerciseIndex: this.currentExerciseIndex,
+            currentRound: this.currentRound,
+            isResting: this.isResting,
+            startTime: this.startTime,
+            completedRounds: this.completedRounds,
+            restEndTime: this.restEndTime
+        };
+        WorkoutState.save(state);
+    }
+
+    loadWorkoutState() {
+        const savedState = WorkoutState.getActive();
+        if (savedState) {
+            // Проверяем, что это тренировка для того же комплекса
+            if (savedState.workoutSetCode === this.workoutSetCode) {
+                this.currentExerciseIndex = savedState.currentExerciseIndex || 0;
+                this.currentRound = savedState.currentRound || 0;
+                this.isResting = savedState.isResting || false;
+                this.startTime = savedState.startTime || Date.now();
+                this.completedRounds = savedState.completedRounds || {};
+                this.restEndTime = savedState.restEndTime;
+
+                // Восстанавливаем состояние упражнений
+                this.restoreExercisesState();
+
+                // Если был активен таймер, проверяем не истек ли он
+                if (this.isResting && this.restEndTime) {
+                    const remaining = this.restEndTime - Date.now();
+                    if (remaining > 0) {
+                        // Продолжаем таймер
+                        const currentCard = document.querySelector(`[data-exercise-index="${this.currentExerciseIndex}"]`);
+                        const exerciseName = currentCard.querySelector('.card-title').textContent.trim();
+                        this.showTimer(Math.ceil(remaining / 1000), exerciseName);
+                        this.timerInterval = setInterval(() => {
+                            this.updateTimer();
+                        }, 100);
+                    } else {
+                        // Таймер истек, завершаем отдых
+                        this.isResting = false;
+                        this.restEndTime = null;
+                    }
+                }
+            } else {
+                // Создаем новое состояние для этого комплекса
+                WorkoutState.create(this.workoutSetCode, this.workoutSetName);
+            }
+        } else {
+            // Создаем новое состояние
+            WorkoutState.create(this.workoutSetCode, this.workoutSetName);
+        }
+
+        // Устанавливаем текущее упражнение (с учетом загруженного состояния)
+        this.setCurrentExercise(this.currentExerciseIndex);
+    }
+
+    restoreExercisesState() {
+        // Восстанавливаем прогресс для каждого упражнения
+        Object.keys(this.completedRounds).forEach(exerciseIndex => {
+            const rounds = this.completedRounds[exerciseIndex];
+            const card = document.querySelector(`[data-exercise-index="${exerciseIndex}"]`);
+            if (card && rounds > 0) {
+                // Обновляем прогресс-бар
+                const progressBar = card.querySelector('.progress-rounds');
+                const roundCount = parseInt(card.dataset.roundCount);
+                const progress = (rounds / roundCount) * 100;
+                progressBar.style.width = `${progress}%`;
+
+                // Обновляем текст прогресса
+                card.querySelector('.current-round').textContent = rounds;
+
+                // Отмечаем выполненные подходы
+                const checkmarks = card.querySelectorAll('.round-check');
+                for (let i = 0; i < rounds; i++) {
+                    if (checkmarks[i]) {
+                        checkmarks[i].className = 'bi bi-check-circle-fill text-success round-check';
+                    }
+                }
+            }
+        });
+    }
+
+    clearWorkoutState() {
+        console.log('🔥 Очищаем состояние тренировки...');
+        console.log('🔥 Состояние ДО очистки:', localStorage.getItem('activeWorkout'));
+
+        // Устанавливаем флаг завершения ПЕРЕД очисткой
+        this.isWorkoutFinished = true;
+        console.log('🔥 Установлен флаг завершения тренировки');
+
+        // Прямая очистка localStorage
+        localStorage.removeItem('activeWorkout');
+
+        // Дополнительная очистка через модуль (если доступен)
+        if (typeof WorkoutState !== 'undefined') {
+            WorkoutState.clear();
+        }
+
+        console.log('🔥 Состояние ПОСЛЕ очистки:', localStorage.getItem('activeWorkout'));
+
+        // Принудительное обновление индикаторов НЕСКОЛЬКО РАЗ
+        console.log('🔥 Запускаем принудительное обновление индикаторов...');
+
+        if (typeof WorkoutState !== 'undefined') {
+            // Сразу
+            WorkoutState.updateIndicators();
+
+            // Через 100мс
+            setTimeout(() => {
+                console.log('🔥 Обновление индикаторов через 100мс');
+                WorkoutState.updateIndicators();
+            }, 100);
+
+            // Через 500мс
+            setTimeout(() => {
+                console.log('🔥 Обновление индикаторов через 500мс');
+                WorkoutState.updateIndicators();
+            }, 500);
+
+            // Через 1 секунду
+            setTimeout(() => {
+                console.log('🔥 Финальное обновление индикаторов через 1сек');
+                WorkoutState.updateIndicators();
+            }, 1000);
+        }
+    }
+
+    initializeUI() {
+        console.log('🔥 Инициализация UI...');
+
+        // Привязываем обработчики событий
+        document.querySelectorAll('.rest-button').forEach(button => {
+            button.addEventListener('click', (e) => {
+                const exerciseCode = e.target.dataset.exerciseCode;
+                this.startRest(exerciseCode);
+            });
+        });
+
+        // Обработчик кнопки завершения тренировки
+        const finishBtn = document.getElementById('finishWorkoutBtn');
+        console.log('🔥 Кнопка завершения найдена:', !!finishBtn);
+
+        if (finishBtn) {
+            console.log('🔥 Подключаем ЕДИНСТВЕННЫЙ обработчик к кнопке завершения');
+
+            // Полностью очищаем все обработчики
+            const newFinishBtn = finishBtn.cloneNode(true);
+            finishBtn.parentNode.replaceChild(newFinishBtn, finishBtn);
+
+            // Добавляем только один обработчик к новой кнопке
+            newFinishBtn.addEventListener('click', (e) => {
+                console.log('🔥 Клик по кнопке завершения тренировки!', e);
+                e.preventDefault();
+                e.stopPropagation();
+                this.finishWorkout();
+            });
+        } else {
+            console.error('🔥 КНОПКА ЗАВЕРШЕНИЯ НЕ НАЙДЕНА!');
+        }
+
+        // Запускаем обновление общего времени
+        setInterval(() => this.updateTotalTime(), 1000);
+
+        // Сохраняем состояние при уходе со страницы
+        window.addEventListener('beforeunload', () => {
+            this.saveWorkoutState();
+        });
+
+        // Периодически сохраняем состояние
+        setInterval(() => {
+            this.saveWorkoutState();
+        }, 5000); // каждые 5 секунд
+
+        // Слушаем изменения состояния из других вкладок
+        window.addEventListener('storage', (e) => {
+            if (e.key === 'activeWorkout' && !e.newValue) {
+                // Состояние было очищено в другой вкладке
+                console.log('Тренировка завершена в другой вкладке');
+                // Можно добавить уведомление пользователю
+            }
+        });
+    }
+
+    setCurrentExercise(index) {
+        // Убираем выделение с предыдущего упражнения
+        document.querySelectorAll('.exercise-card').forEach(card => {
+            card.classList.remove('border-primary');
+            card.querySelector('.exercise-header').style.display = 'none';
+            card.querySelector('.rest-button').style.display = 'none';
+        });
+
+        // Выделяем текущее упражнение
+        const currentCard = document.querySelector(`[data-exercise-index="${index}"]`);
+
+        if (currentCard) {
+            currentCard.classList.add('border-primary');
+            currentCard.querySelector('.exercise-header').style.display = 'block';
+            currentCard.querySelector('.rest-button').style.display = 'block';
+            currentCard.querySelector('.rest-button').disabled = false;
+
+            // Обновляем информационную панель только если не отдыхаем
+            if (!this.isResting) {
+                this.updateCurrentExercisePanel(currentCard);
+            }
+
+            // Прокручиваем к текущему упражнению
+            currentCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        this.currentExerciseIndex = index;
+        // Восстанавливаем количество подходов для текущего упражнения
+        this.currentRound = this.completedRounds[index] || 0;
+    }
+
+    updateCurrentExercisePanel(exerciseCard) {
+        const panel = document.getElementById('currentExercisePanel');
+        const exerciseName = exerciseCard.dataset.exerciseName;
+        const repeatCount = exerciseCard.dataset.repeatCount;
+
+        let exerciseImages = [];
+        try {
+            const imagesData = exerciseCard.dataset.exerciseImages;
+            exerciseImages = JSON.parse(imagesData);
+        } catch (e) {
+            exerciseImages = [];
+        }
+
+        // Обновляем текст
+        document.getElementById('currentExerciseInstruction').textContent = 'Выполните';
+        document.getElementById('currentExerciseName').textContent = exerciseName;
+        document.getElementById('currentExerciseReps').textContent = repeatCount;
+
+        // Обновляем изображения
+        const imagesContainer = document.getElementById('currentExerciseImages');
+        imagesContainer.innerHTML = '';
+
+        exerciseImages.forEach((imagePath, index) => {
+            if (index < 4) { // Показываем максимум 4 изображения
+                const img = document.createElement('img');
+                img.src = `/static/${imagePath}`;
+                img.className = 'img-thumbnail me-2';
+                img.style.cssText = 'width: 160px; height: 160px; object-fit: cover;';
+                img.alt = 'Упражнение';
+                imagesContainer.appendChild(img);
+            }
+        });
+
+        if (exerciseImages.length > 4) {
+            const moreText = document.createElement('span');
+            moreText.className = 'text-muted align-self-center';
+            moreText.textContent = `+${exerciseImages.length - 4}`;
+            imagesContainer.appendChild(moreText);
+        }
+
+        // Показываем панель
+        panel.style.display = 'block';
+
+        // Прокручиваем к панели
+        setTimeout(() => {
+            panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
+    }
+
+    hideCurrentExercisePanel() {
+        document.getElementById('currentExercisePanel').style.display = 'none';
+    }
+
+    startRest(exerciseCode) {
+        const currentCard = document.querySelector(`[data-exercise-code="${exerciseCode}"]`);
+        const restSeconds = parseInt(currentCard.dataset.restSeconds);
+        const exerciseName = currentCard.querySelector('.card-title').textContent.trim();
+
+        // Отмечаем выполненный подход
+        this.markRoundCompleted(currentCard);
+
+        // Отключаем кнопку отдыха
+        currentCard.querySelector('.rest-button').disabled = true;
+
+        // Скрываем информационную панель и показываем таймер
+        this.hideCurrentExercisePanel();
+        this.showTimer(restSeconds, exerciseName);
+
+        this.isResting = true;
+        this.restEndTime = Date.now() + (restSeconds * 1000);
+
+        // Сохраняем состояние
+        this.saveWorkoutState();
+
+        // Запускаем обратный отсчет
+        this.timerInterval = setInterval(() => {
+            this.updateTimer();
+        }, 100);
+    }
+
+    markRoundCompleted(card) {
+        this.currentRound++;
+
+        // Сохраняем в общем состоянии
+        this.completedRounds[this.currentExerciseIndex] = this.currentRound;
+
+        // Обновляем прогресс-бар
+        const progressBar = card.querySelector('.progress-rounds');
+        const roundCount = parseInt(card.dataset.roundCount);
+        const progress = (this.currentRound / roundCount) * 100;
+        progressBar.style.width = `${progress}%`;
+
+        // Обновляем текст прогресса
+        card.querySelector('.current-round').textContent = this.currentRound;
+
+        // Отмечаем галочкой выполненный подход
+        const checkmarks = card.querySelectorAll('.round-check');
+        if (checkmarks[this.currentRound - 1]) {
+            checkmarks[this.currentRound - 1].className = 'bi bi-check-circle-fill text-success round-check';
+        }
+    }
+
+    showTimer(seconds, exerciseName) {
+        const timerCard = document.getElementById('timerCard');
+        const timerDisplay = document.getElementById('timerDisplay');
+        const timerExerciseNameEl = document.getElementById('timerExerciseName');
+
+        timerCard.style.display = 'block';
+        timerExerciseNameEl.textContent = exerciseName;
+        this.updateTimerDisplay(seconds);
+
+        // Прокручиваем к таймеру
+        timerCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    hideTimer() {
+        document.getElementById('timerCard').style.display = 'none';
+    }
+
+    updateTimer() {
+        const remaining = Math.max(0, this.restEndTime - Date.now());
+        const seconds = Math.ceil(remaining / 1000);
+
+        this.updateTimerDisplay(seconds);
+
+        if (remaining <= 0) {
+            this.endRest();
+        }
+    }
+
+    updateTimerDisplay(seconds) {
+        const minutes = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        const timeString = `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        document.getElementById('timerDisplay').textContent = timeString;
+    }
+
+    endRest() {
+        clearInterval(this.timerInterval);
+        this.hideTimer();
+        this.isResting = false;
+        this.restEndTime = null;
+
+        // Звуковое уведомление
+        this.notificationSound.createDoubleBeep();
+
+        // Проверяем, закончены ли все подходы текущего упражнения
+        const currentCard = document.querySelector(`[data-exercise-index="${this.currentExerciseIndex}"]`);
+        const roundCount = parseInt(currentCard.dataset.roundCount);
+
+        if (this.currentRound >= roundCount) {
+            // Упражнение завершено, переходим к следующему
+            setTimeout(() => {
+                this.moveToNextExercise();
+            }, 1000); // Небольшая пауза для визуального восприятия
+        } else {
+            // Включаем кнопку отдыха для следующего подхода и показываем панель упражнения
+            currentCard.querySelector('.rest-button').disabled = false;
+            this.updateCurrentExercisePanel(currentCard);
+        }
+
+        // Сохраняем состояние
+        this.saveWorkoutState();
+    }
+
+    moveToNextExercise() {
+        if (this.currentExerciseIndex + 1 >= this.exercises.length) {
+            // Тренировка завершена автоматически
+            this.completeWorkout();
+        } else {
+            // Переходим к следующему упражнению
+            this.setCurrentExercise(this.currentExerciseIndex + 1);
+            this.saveWorkoutState();
+        }
+    }
+
+    updateTotalTime() {
+        const elapsed = Date.now() - this.startTime;
+        const totalSeconds = Math.floor(elapsed / 1000);
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        const timeString = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        document.getElementById('totalTime').textContent = `Общее время: ${timeString}`;
+    }
+
+    getCompletedExercises() {
+        /**
+         * Собирает информацию о завершенных упражнениях для статистики
+         * Возвращает массив кодов упражнений, которые были полностью завершены
+         */
+        const completedExercises = [];
+
+        // Проходим по всем упражнениям и проверяем, завершены ли они полностью
+        this.exercises.forEach((exercise, index) => {
+            const completedRounds = this.completedRounds[index] || 0;
+            const totalRounds = exercise.round_count;
+
+            // Считаем упражнение завершенным, если выполнены все подходы
+            if (completedRounds >= totalRounds) {
+                completedExercises.push(exercise.code);
+            }
+        });
+
+        console.log('🔥 Завершенные упражнения:', completedExercises);
+        return completedExercises;
+    }
+
+    finishWorkout() {
+        console.log('🔥 finishWorkout() вызван');
+        // Принудительное завершение тренировки
+        if (confirm('Вы уверены, что хотите завершить тренировку?')) {
+            console.log('🔥 Пользователь подтвердил завершение тренировки');
+
+            // Сразу очищаем состояние
+            this.clearWorkoutState();
+
+            // Скрываем информационную панель и таймер
+            this.hideCurrentExercisePanel();
+            if (this.timerInterval) {
+                clearInterval(this.timerInterval);
+                this.hideTimer();
+            }
+
+            const totalDuration = Math.floor((Date.now() - this.startTime) / 1000);
+
+            // Отображаем финальное время
+            const minutes = Math.floor(totalDuration / 60);
+            const seconds = totalDuration % 60;
+            const timeString = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            document.getElementById('finalTime').textContent = timeString;
+
+            // Сохраняем результат тренировки в фоновом режиме
+            fetch(`/workout-sets/{{ workout_set.code }}/complete`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    duration_seconds: totalDuration,
+                    completed_exercises: this.getCompletedExercises()
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    console.log('Тренировка сохранена:', data.message);
+                } else {
+                    console.error('Ошибка сохранения:', data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Ошибка при сохранении тренировки:', error);
+            });
+
+            // Показываем модальное окно завершения
+            const completeModal = new bootstrap.Modal(document.getElementById('completeModal'));
+            completeModal.show();
+        } else {
+            console.log('🔥 Пользователь отменил завершение тренировки');
+        }
+    }
+
+    completeWorkout() {
+        console.log('🔥 completeWorkout() - автоматическое завершение тренировки');
+
+        // Устанавливаем флаг завершения
+        this.isWorkoutFinished = true;
+        console.log('🔥 Установлен флаг завершения тренировки (автоматически)');
+
+        // Скрываем информационную панель
+        this.hideCurrentExercisePanel();
+
+        // Останавливаем таймер если он активен
+        if (this.timerInterval) {
+            clearInterval(this.timerInterval);
+            this.hideTimer();
+        }
+
+        // Очищаем состояние тренировки сразу
+        this.clearWorkoutState();
+
+        const totalDuration = Math.floor((Date.now() - this.startTime) / 1000);
+
+        // Отображаем финальное время
+        const minutes = Math.floor(totalDuration / 60);
+        const seconds = totalDuration % 60;
+        const timeString = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        document.getElementById('finalTime').textContent = timeString;
+
+        // Сохраняем результат тренировки
+        fetch(`/workout-sets/{{ workout_set.code }}/complete`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                duration_seconds: totalDuration,
+                completed_exercises: this.getCompletedExercises()
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                console.log('Тренировка сохранена:', data.message);
+            } else {
+                console.error('Ошибка сохранения:', data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Ошибка при сохранении тренировки:', error);
+        });
+
+        // Показываем модальное окно завершения
+        const completeModal = new bootstrap.Modal(document.getElementById('completeModal'));
+        completeModal.show();
+    }
+}
+
+// Инициализация тренировки
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🔥 DOM загружен, начинаем инициализацию тренировки...');
+
+    const exercises = {{ exercises | tojson }};
+    console.log('🔥 Упражнения:', exercises);
+
+    try {
+        console.log('🔥 Создаем WorkoutSession...');
+        window.workoutSession = new WorkoutSession(exercises);
+        console.log('🔥 WorkoutSession создан:', !!window.workoutSession);
+    } catch (error) {
+        console.error('🔥 Ошибка создания WorkoutSession:', error);
+    }
+
+    // Глобальная функция для отладки - принудительная очистка состояния
+    window.forceResetWorkout = function() {
+        console.log('🔥 Принудительный сброс тренировки');
+
+        // Очищаем localStorage напрямую
+        localStorage.removeItem('activeWorkout');
+        localStorage.clear(); // На всякий случай очищаем весь localStorage
+
+        // Обновляем индикаторы
+        if (typeof WorkoutState !== 'undefined') {
+            WorkoutState.updateIndicators();
+        }
+
+        // Перезагружаем страницу для полного сброса
+        setTimeout(() => {
+            window.location.reload();
+        }, 500);
+
+        console.log('🔥 Состояние очищено, страница будет перезагружена');
+        alert('Состояние тренировки принудительно очищено! Страница будет перезагружена.');
+    };
+
+    // Глобальная функция для тестирования кнопки завершения
+    window.testFinishButton = function() {
+        console.log('🔥 Тестируем кнопку завершения...');
+        const btn = document.getElementById('finishWorkoutBtn');
+        console.log('🔥 Кнопка найдена:', !!btn);
+        if (btn) {
+            console.log('🔥 Имитируем клик...');
+            btn.click();
+        } else {
+            console.error('🔥 Кнопка не найдена!');
+        }
+    };
+
+    // Функция для проверки состояния
+    window.checkWorkoutState = function() {
+        const state = localStorage.getItem('activeWorkout');
+        console.log('🔥 Текущее состояние:', state);
+        if (state) {
+            try {
+                const parsed = JSON.parse(state);
+                console.log('🔥 Распарсенное состояние:', parsed);
+            } catch (e) {
+                console.error('🔥 Ошибка парсинга:', e);
+            }
+        } else {
+            console.log('🔥 Состояние пустое');
+        }
+    };
+});
+</script>
+
+<style>
+.exercise-card {
+    transition: all 0.3s ease;
+}
+
+.exercise-card.border-primary {
+    box-shadow: 0 0 15px rgba(13, 110, 253, 0.3);
+}
+
+.rounds-checkmarks {
+    display: flex;
+    justify-content: center;
+    gap: 5px;
+}
+
+.round-check {
+    font-size: 1.2rem;
+    color: #6c757d;
+}
+
+#timerCard {
+    animation: pulse 2s infinite;
+}
+
+#currentExercisePanel {
+    animation: slideIn 0.5s ease-out;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.02); }
+    100% { transform: scale(1); }
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.exercise-images img {
+    border-radius: 4px;
+}
+</style>
+{% endblock %}

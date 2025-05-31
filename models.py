@@ -322,12 +322,21 @@ class WorkoutLogModel:
             cursor = conn.cursor()
             cursor.execute('''
                 SELECT wl.code, wl.date, wl.workoutset_code, wl.duration_seconds,
-                       ws.name as workoutset_name
+                       wl.completed_exercises, ws.name as workoutset_name
                 FROM workout_logs wl
                 LEFT JOIN workout_sets ws ON wl.workoutset_code = ws.code
                 ORDER BY wl.date DESC
             ''')
-            return [dict(row) for row in cursor.fetchall()]
+            logs = []
+            for row in cursor.fetchall():
+                log = dict(row)
+                # Парсим JSON массив завершенных упражнений
+                try:
+                    log['completed_exercises'] = json.loads(log['completed_exercises']) if log['completed_exercises'] else []
+                except (json.JSONDecodeError, TypeError):
+                    log['completed_exercises'] = []
+                logs.append(log)
+            return logs
 
     @staticmethod
     def get_last_workout_for_set(workoutset_code: str) -> Optional[Dict[str, Any]]:
@@ -335,28 +344,39 @@ class WorkoutLogModel:
         with get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute('''
-                SELECT code, date, workoutset_code, duration_seconds
+                SELECT code, date, workoutset_code, duration_seconds, completed_exercises
                 FROM workout_logs
                 WHERE workoutset_code = ?
                 ORDER BY date DESC
                 LIMIT 1
             ''', (workoutset_code,))
             row = cursor.fetchone()
-            return dict(row) if row else None
+            if row:
+                log = dict(row)
+                # Парсим JSON массив завершенных упражнений
+                try:
+                    log['completed_exercises'] = json.loads(log['completed_exercises']) if log['completed_exercises'] else []
+                except (json.JSONDecodeError, TypeError):
+                    log['completed_exercises'] = []
+                return log
+            return None
 
     @staticmethod
-    def create(workoutset_code: str, duration_seconds: int, workout_date: str = None) -> str:
+    def create(workoutset_code: str, duration_seconds: int, workout_date: str = None,
+               completed_exercises: List[str] = None) -> str:
         """Создает новую запись в журнале тренировок."""
         code = str(uuid4())
         if workout_date is None:
             workout_date = datetime.now().isoformat()
 
+        completed_exercises_json = json.dumps(completed_exercises or [])
+
         with get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute('''
-                INSERT INTO workout_logs (code, date, workoutset_code, duration_seconds)
-                VALUES (?, ?, ?, ?)
-            ''', (code, workout_date, workoutset_code, duration_seconds))
+                INSERT INTO workout_logs (code, date, workoutset_code, duration_seconds, completed_exercises)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (code, workout_date, workoutset_code, duration_seconds, completed_exercises_json))
             conn.commit()
         return code
 
@@ -377,3 +397,194 @@ class WorkoutLogModel:
             cursor.execute('DELETE FROM workout_logs WHERE workoutset_code = ?', (workoutset_code,))
             conn.commit()
             return cursor.rowcount
+
+    @staticmethod
+    def delete_all() -> int:
+        """Удаляет все записи из журнала тренировок."""
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('DELETE FROM workout_logs')
+            conn.commit()
+            return cursor.rowcount
+
+    @staticmethod
+    def calculate_completion_percentage(workoutset_code: str, completed_exercises: List[str]) -> int:
+        """Рассчитывает процент завершения тренировки."""
+        if not completed_exercises:
+            return 0
+
+        # Получаем общее количество упражнений в комплексе
+        total_exercises = WorkoutSetModel.count_exercises(workoutset_code)
+
+        if total_exercises == 0:
+            return 0
+
+        # Рассчитываем процент
+        completed_count = len(completed_exercises)
+        percentage = round((completed_count / total_exercises) * 100)
+
+        return min(percentage, 100)  # Ограничиваем максимум 100%
+
+
+class DatabaseManager:
+    """Класс для управления бэкапом и восстановлением базы данных."""
+
+    @staticmethod
+    def create_backup() -> str:
+        """
+        Создает бэкап базы данных.
+        Возвращает путь к созданному файлу бэкапа.
+        """
+        import shutil
+        from datetime import datetime
+
+        backup_dir = os.path.join(os.path.dirname(__file__), 'backups')
+        if not os.path.exists(backup_dir):
+            os.makedirs(backup_dir)
+
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        backup_filename = f'workout_backup_{timestamp}.db'
+        backup_path = os.path.join(backup_dir, backup_filename)
+
+        db_path = get_db_path()
+        if not os.path.exists(db_path):
+            raise FileNotFoundError("База данных не найдена")
+
+        shutil.copy2(db_path, backup_path)
+        return backup_path
+
+    @staticmethod
+    def restore_from_backup(backup_file_path: str) -> bool:
+        """
+        Восстанавливает базу данных из бэкапа.
+
+        Args:
+            backup_file_path: Путь к файлу бэкапа
+
+        Returns:
+            bool: True если восстановление прошло успешно
+
+        Raises:
+            FileNotFoundError: Если файл бэкапа не найден
+            sqlite3.DatabaseError: Если файл не является корректной БД SQLite
+        """
+        import shutil
+
+        if not os.path.exists(backup_file_path):
+            raise FileNotFoundError("Файл бэкапа не найден")
+
+        # Проверяем что файл является корректной БД SQLite
+        try:
+            test_conn = sqlite3.connect(backup_file_path)
+            # Проверяем что в БД есть нужные таблицы
+            cursor = test_conn.cursor()
+            cursor.execute("""
+                SELECT name FROM sqlite_master
+                WHERE type='table' AND name IN ('workout_sets', 'exercises', 'user_prefs', 'workout_logs')
+            """)
+            tables = [row[0] for row in cursor.fetchall()]
+            test_conn.close()
+
+            if len(tables) < 3:  # Минимум 3 основные таблицы должны быть
+                raise sqlite3.DatabaseError("Файл не содержит корректную структуру БД приложения")
+
+        except sqlite3.Error as e:
+            raise sqlite3.DatabaseError(f"Неверный формат файла базы данных: {str(e)}")
+
+        # Создаем резервную копию текущей БД
+        db_path = get_db_path()
+        if os.path.exists(db_path):
+            from datetime import datetime
+            backup_current = f"{db_path}.backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            shutil.copy2(db_path, backup_current)
+
+        # Восстанавливаем из бэкапа
+        shutil.copy2(backup_file_path, db_path)
+        return True
+
+    @staticmethod
+    def get_database_info() -> Dict[str, Any]:
+        """Получает информацию о текущей базе данных."""
+        db_path = get_db_path()
+
+        if not os.path.exists(db_path):
+            return {
+                'exists': False,
+                'size': 0,
+                'modified': None,
+                'tables_count': 0,
+                'records_count': {}
+            }
+
+        # Размер файла
+        size = os.path.getsize(db_path)
+
+        # Дата модификации
+        modified = datetime.fromtimestamp(os.path.getmtime(db_path))
+
+        # Подсчет записей в таблицах
+        records_count = {}
+        try:
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+
+                # Получаем список таблиц
+                cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+                tables = [row[0] for row in cursor.fetchall()]
+
+                # Подсчитываем записи в каждой таблице
+                for table in tables:
+                    cursor.execute(f"SELECT COUNT(*) FROM {table}")
+                    records_count[table] = cursor.fetchone()[0]
+
+        except sqlite3.Error:
+            records_count = {}
+
+        return {
+            'exists': True,
+            'size': size,
+            'modified': modified,
+            'tables_count': len(tables) if 'tables' in locals() else 0,
+            'records_count': records_count
+        }
+
+    @staticmethod
+    def list_backups() -> List[Dict[str, Any]]:
+        """Возвращает список доступных бэкапов."""
+        backup_dir = os.path.join(os.path.dirname(__file__), 'backups')
+
+        if not os.path.exists(backup_dir):
+            return []
+
+        backups = []
+        for filename in os.listdir(backup_dir):
+            if filename.startswith('workout_backup_') and filename.endswith('.db'):
+                filepath = os.path.join(backup_dir, filename)
+                size = os.path.getsize(filepath)
+                modified = datetime.fromtimestamp(os.path.getmtime(filepath))
+
+                backups.append({
+                    'filename': filename,
+                    'filepath': filepath,
+                    'size': size,
+                    'modified': modified
+                })
+
+        # Сортируем по дате (новые сначала)
+        backups.sort(key=lambda x: x['modified'], reverse=True)
+        return backups
+
+    @staticmethod
+    def delete_backup(filename: str) -> bool:
+        """Удаляет файл бэкапа."""
+        backup_dir = os.path.join(os.path.dirname(__file__), 'backups')
+        backup_path = os.path.join(backup_dir, filename)
+
+        if not os.path.exists(backup_path) or not filename.startswith('workout_backup_'):
+            return False
+
+        try:
+            os.remove(backup_path)
+            return True
+        except OSError:
+            return False

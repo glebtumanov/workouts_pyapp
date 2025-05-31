@@ -1,8 +1,9 @@
+#! /usr/bin/env python3
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from werkzeug.utils import secure_filename
 import os
 import json
-from models import WorkoutSetModel, ExerciseModel, UserPrefsModel, WorkoutLogModel
+from models import WorkoutSetModel, ExerciseModel, UserPrefsModel, WorkoutLogModel, DatabaseManager
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'dev-secret-key-change-in-production'
@@ -230,11 +231,13 @@ def workout_sets_update(code):
 def workout_sets_delete(code):
     """Удаление комплекса"""
     try:
-        # Сначала удаляем все записи тренировок для этого комплекса
+        # Сначала удаляем записи журнала тренировок для этого комплекса
         WorkoutLogModel.delete_by_workoutset(code)
-        # Затем удаляем все упражнения (они могут удалиться автоматически через CASCADE)
+
+        # Затем удаляем все упражнения комплекса
         ExerciseModel.delete_by_workoutset(code)
-        # Наконец удаляем сам комплекс
+
+        # И наконец удаляем сам комплекс
         success = WorkoutSetModel.delete(code)
         if success:
             flash('Комплекс успешно удален', 'success')
@@ -246,11 +249,56 @@ def workout_sets_delete(code):
     return redirect(url_for('workout_sets_list'))
 
 
+@app.route('/workout-sets/<code>/start')
+def workout_start(code):
+    """Страница тренировки - выполнение комплекса упражнений"""
+    workout_set = WorkoutSetModel.get_by_code(code)
+    if not workout_set:
+        flash('Комплекс не найден', 'error')
+        return redirect(url_for('workout_sets_list'))
+
+    exercises = ExerciseModel.get_by_workoutset(code)
+    if not exercises:
+        flash('В комплексе нет упражнений. Добавьте упражнения перед тренировкой.', 'warning')
+        return redirect(url_for('workout_sets_edit', code=code))
+
+    return render_template('workout_sets/workout.html',
+                         workout_set=workout_set,
+                         exercises=exercises)
+
+
+@app.route('/workout-sets/<code>/complete', methods=['POST'])
+def workout_complete(code):
+    """Завершение тренировки и сохранение результата"""
+    try:
+        duration_seconds = request.json.get('duration_seconds', 0)
+        completed_exercises = request.json.get('completed_exercises', [])
+
+        if duration_seconds <= 0:
+            return jsonify({'success': False, 'error': 'Некорректная длительность тренировки'})
+
+        # Сохраняем результат тренировки с информацией о завершенных упражнениях
+        from datetime import datetime
+        workout_date = datetime.now().isoformat()
+        workout_log_code = WorkoutLogModel.create(code, duration_seconds, workout_date, completed_exercises)
+
+        return jsonify({
+            'success': True,
+            'message': 'Тренировка завершена и сохранена!',
+            'log_code': workout_log_code
+        })
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'Ошибка при сохранении: {str(e)}'})
+
+
 @app.route('/settings')
 def settings():
     """Страница настроек приложения"""
     prefs = UserPrefsModel.get_first()
-    return render_template('settings.html', prefs=prefs)
+    db_info = DatabaseManager.get_database_info()
+    backups = DatabaseManager.list_backups()
+    return render_template('settings.html', prefs=prefs, db_info=db_info, backups=backups)
 
 
 @app.route('/exercises/<code>/delete', methods=['POST'])
@@ -445,6 +493,211 @@ def settings_save():
         flash(f'Ошибка при сохранении настроек: {str(e)}', 'error')
 
     return redirect(url_for('settings'))
+
+
+@app.route('/settings/backup/create', methods=['POST'])
+def backup_create():
+    """Создание бэкапа базы данных"""
+    try:
+        backup_path = DatabaseManager.create_backup()
+        backup_filename = os.path.basename(backup_path)
+        flash(f'Бэкап успешно создан: {backup_filename}', 'success')
+    except FileNotFoundError:
+        flash('База данных не найдена', 'error')
+    except Exception as e:
+        flash(f'Ошибка при создании бэкапа: {str(e)}', 'error')
+
+    return redirect(url_for('settings'))
+
+
+@app.route('/settings/backup/download/<filename>')
+def backup_download(filename):
+    """Скачивание файла бэкапа"""
+    if not filename.startswith('workout_backup_') or not filename.endswith('.db'):
+        flash('Неверное имя файла бэкапа', 'error')
+        return redirect(url_for('settings'))
+
+    backup_dir = os.path.join(os.path.dirname(__file__), 'backups')
+    backup_path = os.path.join(backup_dir, filename)
+
+    if not os.path.exists(backup_path):
+        flash('Файл бэкапа не найден', 'error')
+        return redirect(url_for('settings'))
+
+    from flask import send_file
+    return send_file(backup_path, as_attachment=True, download_name=filename)
+
+
+@app.route('/settings/backup/restore', methods=['POST'])
+def backup_restore():
+    """Восстановление базы данных из бэкапа"""
+    if 'backup_file' not in request.files:
+        flash('Файл бэкапа не выбран', 'error')
+        return redirect(url_for('settings'))
+
+    backup_file = request.files['backup_file']
+    if backup_file.filename == '':
+        flash('Файл бэкапа не выбран', 'error')
+        return redirect(url_for('settings'))
+
+    # Проверяем расширение файла
+    if not backup_file.filename.endswith('.db'):
+        flash('Файл должен иметь расширение .db', 'error')
+        return redirect(url_for('settings'))
+
+    try:
+        # Сохраняем временный файл
+        import tempfile
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.db') as temp_file:
+            backup_file.save(temp_file.name)
+            temp_path = temp_file.name
+
+        # Восстанавливаем из временного файла
+        DatabaseManager.restore_from_backup(temp_path)
+
+        # Удаляем временный файл
+        os.unlink(temp_path)
+
+        flash('База данных успешно восстановлена из бэкапа', 'success')
+
+    except FileNotFoundError:
+        flash('Файл бэкапа не найден', 'error')
+    except Exception as e:
+        if 'temp_path' in locals() and os.path.exists(temp_path):
+            os.unlink(temp_path)
+        flash(f'Ошибка при восстановлении: {str(e)}', 'error')
+
+    return redirect(url_for('settings'))
+
+
+@app.route('/settings/backup/delete/<filename>', methods=['POST'])
+def backup_delete(filename):
+    """Удаление файла бэкапа"""
+    try:
+        success = DatabaseManager.delete_backup(filename)
+        if success:
+            flash('Бэкап успешно удален', 'success')
+        else:
+            flash('Ошибка при удалении бэкапа', 'error')
+    except Exception as e:
+        flash(f'Ошибка при удалении бэкапа: {str(e)}', 'error')
+
+    return redirect(url_for('settings'))
+
+
+@app.route('/settings/backup/restore-from/<filename>', methods=['POST'])
+def backup_restore_from_existing(filename):
+    """Восстановление базы данных из существующего бэкапа"""
+    if not filename.startswith('workout_backup_') or not filename.endswith('.db'):
+        flash('Неверное имя файла бэкапа', 'error')
+        return redirect(url_for('settings'))
+
+    backup_dir = os.path.join(os.path.dirname(__file__), 'backups')
+    backup_path = os.path.join(backup_dir, filename)
+
+    if not os.path.exists(backup_path):
+        flash('Файл бэкапа не найден', 'error')
+        return redirect(url_for('settings'))
+
+    try:
+        # Восстанавливаем из существующего бэкапа
+        DatabaseManager.restore_from_backup(backup_path)
+        flash(f'База данных успешно восстановлена из бэкапа: {filename}', 'success')
+
+    except Exception as e:
+        flash(f'Ошибка при восстановлении из бэкапа: {str(e)}', 'error')
+
+    return redirect(url_for('settings'))
+
+
+@app.route('/statistics')
+def statistics():
+    """Страница статистики тренировок"""
+    workout_logs = WorkoutLogModel.get_all()
+
+    # Фильтруем записи за последние 30 дней для карточек статистики
+    from datetime import datetime, timedelta
+    thirty_days_ago = datetime.now() - timedelta(days=30)
+    recent_logs = []
+
+    for log in workout_logs:
+        try:
+            log_date = datetime.fromisoformat(log['date'].replace('Z', ''))
+            if log_date >= thirty_days_ago:
+                recent_logs.append(log)
+        except:
+            continue
+
+    # Форматируем данные для отображения
+    for log in workout_logs:
+        # Форматируем дату
+        try:
+            from datetime import datetime
+            date_obj = datetime.fromisoformat(log['date'].replace('Z', ''))
+            log['formatted_date'] = date_obj.strftime('%d.%m.%Y')
+            log['formatted_time'] = date_obj.strftime('%H:%M')
+            weekdays = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье']
+            log['weekday'] = weekdays[date_obj.weekday()]
+        except:
+            log['formatted_date'] = log['date']
+            log['formatted_time'] = ''
+            log['weekday'] = ''
+
+        # Форматируем длительность
+        duration = log['duration_seconds']
+        hours = duration // 3600
+        minutes = (duration % 3600) // 60
+        seconds = duration % 60
+
+        if hours > 0:
+            log['formatted_duration'] = f"{hours}:{minutes:02d}:{seconds:02d}"
+        else:
+            log['formatted_duration'] = f"{minutes}:{seconds:02d}"
+
+        # Рассчитываем процент завершения
+        if log['workoutset_code'] and log['completed_exercises']:
+            completion_percentage = WorkoutLogModel.calculate_completion_percentage(
+                log['workoutset_code'],
+                log['completed_exercises']
+            )
+            log['completion_percentage'] = completion_percentage
+        else:
+            # Для старых записей без информации о завершенных упражнениях
+            log['completion_percentage'] = None
+
+    return render_template('statistics.html',
+                         workout_logs=workout_logs,
+                         recent_logs=recent_logs)
+
+
+@app.route('/statistics/log/<code>/delete', methods=['POST'])
+def statistics_log_delete(code):
+    """Удаление отдельной записи из журнала тренировок"""
+    try:
+        success = WorkoutLogModel.delete(code)
+        if success:
+            flash('Запись удалена из журнала тренировок', 'success')
+        else:
+            flash('Запись не найдена', 'error')
+    except Exception as e:
+        flash(f'Ошибка при удалении записи: {str(e)}', 'error')
+
+    return redirect(url_for('statistics'))
+
+
+@app.route('/statistics/clear-all', methods=['POST'])
+def statistics_clear_all():
+    """Полная очистка журнала тренировок"""
+    try:
+        deleted_count = WorkoutLogModel.delete_all()
+        if deleted_count > 0:
+            flash(f'Удалено записей: {deleted_count}', 'success')
+        else:
+            flash('Журнал тренировок уже пуст', 'info')
+    except Exception as e:
+        flash(f'Ошибка при очистке журнала: {str(e)}', 'error')
+
+    return redirect(url_for('statistics'))
 
 
 if __name__ == '__main__':
