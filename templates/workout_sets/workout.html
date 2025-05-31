@@ -40,6 +40,23 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Панель разминки -->
+                <div class="card border-info" id="warmupPanel" style="display: none;">
+                    <div class="card-body text-center">
+                        <div class="mb-3">
+                            <i class="bi bi-person-arms-up text-info" style="font-size: 3rem;"></i>
+                        </div>
+                        <h4 class="text-info mb-3">Разомнитесь</h4>
+                        <p class="text-muted mb-4">
+                            Подготовьте тело к тренировке: сделайте легкую разминку,
+                            разогрейте суставы и мышцы.
+                        </p>
+                        <button class="btn btn-warning btn-lg" id="warmupCompleteBtn">
+                            <i class="bi bi-pause-circle"></i> Отдых (после разминки)
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -203,7 +220,8 @@ class WorkoutSession {
         this.currentExerciseIndex = 0;
         this.currentRound = 0;
         this.isResting = false;
-        this.startTime = Date.now();
+        this.isWarmingUp = true; // Новый флаг для этапа разминки
+        this.startTime = null; // Время начала - устанавливается после разминки
         this.timerInterval = null;
         this.restEndTime = null;
         this.completedRounds = {}; // Сохраняем выполненные подходы для каждого упражнения
@@ -218,16 +236,14 @@ class WorkoutSession {
         this.initializeUI();
         console.log('🔥 Вызываем loadWorkoutState...');
         this.loadWorkoutState(); // Загружаем сохраненное состояние
-        console.log('🔥 Вызываем updateTotalTime...');
-        this.updateTotalTime();
 
         console.log('🔥 WorkoutSession полностью инициализирован');
     }
 
     saveWorkoutState() {
-        // Не сохраняем состояние если тренировка завершена
-        if (this.isWorkoutFinished) {
-            console.log('🔥 Тренировка завершена, НЕ сохраняем состояние');
+        // Не сохраняем состояние если тренировка завершена или идет разминка
+        if (this.isWorkoutFinished || this.isWarmingUp) {
+            console.log('🔥 Тренировка завершена или идет разминка, НЕ сохраняем состояние');
             return;
         }
 
@@ -237,6 +253,7 @@ class WorkoutSession {
             currentExerciseIndex: this.currentExerciseIndex,
             currentRound: this.currentRound,
             isResting: this.isResting,
+            isWarmingUp: this.isWarmingUp,
             startTime: this.startTime,
             completedRounds: this.completedRounds,
             restEndTime: this.restEndTime
@@ -252,12 +269,15 @@ class WorkoutSession {
                 this.currentExerciseIndex = savedState.currentExerciseIndex || 0;
                 this.currentRound = savedState.currentRound || 0;
                 this.isResting = savedState.isResting || false;
-                this.startTime = savedState.startTime || Date.now();
+                this.isWarmingUp = savedState.isWarmingUp !== undefined ? savedState.isWarmingUp : true;
+                this.startTime = savedState.startTime || null;
                 this.completedRounds = savedState.completedRounds || {};
                 this.restEndTime = savedState.restEndTime;
 
-                // Восстанавливаем состояние упражнений
-                this.restoreExercisesState();
+                // Восстанавливаем состояние упражнений только если разминка завершена
+                if (!this.isWarmingUp) {
+                    this.restoreExercisesState();
+                }
 
                 // Если был активен таймер, проверяем не истек ли он
                 if (this.isResting && this.restEndTime) {
@@ -276,17 +296,19 @@ class WorkoutSession {
                         this.restEndTime = null;
                     }
                 }
-            } else {
-                // Создаем новое состояние для этого комплекса
-                WorkoutState.create(this.workoutSetCode, this.workoutSetName);
             }
-        } else {
-            // Создаем новое состояние
-            WorkoutState.create(this.workoutSetCode, this.workoutSetName);
         }
 
-        // Устанавливаем текущее упражнение (с учетом загруженного состояния)
-        this.setCurrentExercise(this.currentExerciseIndex);
+        // Устанавливаем начальное состояние в зависимости от этапа
+        if (this.isWarmingUp) {
+            this.showWarmupPanel();
+        } else {
+            this.setCurrentExercise(this.currentExerciseIndex);
+            // Обновляем время только для продолжающихся тренировок
+            if (this.startTime) {
+                this.updateTotalTime();
+            }
+        }
     }
 
     restoreExercisesState() {
@@ -370,6 +392,17 @@ class WorkoutSession {
                 this.startRest(exerciseCode);
             });
         });
+
+        // Обработчик кнопки завершения разминки
+        const warmupBtn = document.getElementById('warmupCompleteBtn');
+        if (warmupBtn) {
+            warmupBtn.addEventListener('click', (e) => {
+                console.log('🔥 Клик по кнопке завершения разминки');
+                e.preventDefault();
+                e.stopPropagation();
+                this.completeWarmup();
+            });
+        }
 
         // Обработчик кнопки завершения тренировки
         const finishBtn = document.getElementById('finishWorkoutBtn');
@@ -500,6 +533,51 @@ class WorkoutSession {
         document.getElementById('currentExercisePanel').style.display = 'none';
     }
 
+    showWarmupPanel() {
+        console.log('🔥 Показываем панель разминки');
+        const panel = document.getElementById('warmupPanel');
+        panel.style.display = 'block';
+
+        // Прокручиваем к панели
+        setTimeout(() => {
+            panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
+    }
+
+    hideWarmupPanel() {
+        document.getElementById('warmupPanel').style.display = 'none';
+    }
+
+    completeWarmup() {
+        console.log('🔥 Завершаем разминку, начинаем тренировку');
+
+        // Завершаем этап разминки
+        this.isWarmingUp = false;
+        this.startTime = Date.now(); // Начинаем отсчет времени тренировки
+
+        // Создаем состояние тренировки
+        WorkoutState.create(this.workoutSetCode, this.workoutSetName);
+
+        // Скрываем панель разминки
+        this.hideWarmupPanel();
+
+        // Получаем время отдыха после разминки из настроек
+        const warmupRestSeconds = {{ user_prefs.default_warmup_rest_seconds }};
+
+        // Запускаем таймер отдыха после разминки
+        this.showTimer(warmupRestSeconds, 'Разминка завершена');
+        this.isResting = true;
+        this.restEndTime = Date.now() + (warmupRestSeconds * 1000);
+
+        // Сохраняем состояние
+        this.saveWorkoutState();
+
+        // Запускаем таймер
+        this.timerInterval = setInterval(() => {
+            this.updateTimer();
+        }, 100);
+    }
+
     startRest(exerciseCode) {
         const currentCard = document.querySelector(`[data-exercise-code="${exerciseCode}"]`);
         const restSeconds = parseInt(currentCard.dataset.restSeconds);
@@ -608,6 +686,15 @@ class WorkoutSession {
         // Звуковое уведомление
         this.notificationSound.createDoubleBeep();
 
+        // Проверяем, было ли это окончание таймера после разминки
+        if (this.currentExerciseIndex === 0 && this.currentRound === 0 && Object.keys(this.completedRounds).length === 0) {
+            // Это первый раз после разминки - показываем первое упражнение
+            console.log('🔥 Таймер после разминки завершен, начинаем первое упражнение');
+            this.setCurrentExercise(0);
+            this.saveWorkoutState();
+            return;
+        }
+
         // Проверяем, закончены ли все подходы текущего упражнения
         const currentCard = document.querySelector(`[data-exercise-index="${this.currentExerciseIndex}"]`);
         const roundCount = parseInt(currentCard.dataset.roundCount);
@@ -639,12 +726,17 @@ class WorkoutSession {
     }
 
     updateTotalTime() {
-        const elapsed = Date.now() - this.startTime;
-        const totalSeconds = Math.floor(elapsed / 1000);
-        const minutes = Math.floor(totalSeconds / 60);
-        const seconds = totalSeconds % 60;
-        const timeString = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-        document.getElementById('totalTime').textContent = `Общее время: ${timeString}`;
+        // Показываем время только если тренировка началась
+        if (this.startTime) {
+            const elapsed = Date.now() - this.startTime;
+            const totalSeconds = Math.floor(elapsed / 1000);
+            const minutes = Math.floor(totalSeconds / 60);
+            const seconds = totalSeconds % 60;
+            const timeString = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            document.getElementById('totalTime').textContent = `Общее время: ${timeString}`;
+        } else {
+            document.getElementById('totalTime').textContent = 'Общее время: 00:00';
+        }
     }
 
     getCompletedExercises() {
@@ -873,6 +965,10 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 
 #currentExercisePanel {
+    animation: slideIn 0.5s ease-out;
+}
+
+#warmupPanel {
     animation: slideIn 0.5s ease-out;
 }
 

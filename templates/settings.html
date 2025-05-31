@@ -60,6 +60,21 @@
                         <div class="form-text">Время отдыха между подходами в секундах</div>
                     </div>
 
+                    <div class="mb-4">
+                        <label for="default_warmup_rest_seconds" class="form-label">
+                            Время отдыха после разминки в сек. <span class="text-danger">*</span>
+                        </label>
+                        <input type="number"
+                               class="form-control"
+                               id="default_warmup_rest_seconds"
+                               name="default_warmup_rest_seconds"
+                               value="{{ prefs.default_warmup_rest_seconds if prefs else 120 }}"
+                               min="0"
+                               max="9999"
+                               required>
+                        <div class="form-text">Время отдыха после завершения разминки в секундах</div>
+                    </div>
+
                     <div class="d-grid gap-2 d-md-flex justify-content-md-end">
                         <a href="{{ url_for('index') }}" class="btn btn-secondary">
                             <i class="bi bi-arrow-left"></i> Назад

@@ -264,9 +264,13 @@ def workout_start(code):
         flash('В комплексе нет упражнений. Добавьте упражнения перед тренировкой.', 'warning')
         return redirect(url_for('workout_sets_edit', code=code))
 
+    # Получаем настройки пользователя для времени отдыха после разминки
+    user_prefs = UserPrefsModel.get_defaults()
+
     return render_template('workout_sets/workout.html',
                          workout_set=workout_set,
-                         exercises=exercises)
+                         exercises=exercises,
+                         user_prefs=user_prefs)
 
 
 @app.route('/workout-sets/<code>/complete', methods=['POST'])
@@ -454,6 +458,7 @@ def settings_save():
         default_round_count = int(request.form.get('default_round_count', 3))
         default_repeat_count = int(request.form.get('default_repeat_count', 10))
         default_rest_seconds = int(request.form.get('default_rest_seconds', 60))
+        default_warmup_rest_seconds = int(request.form.get('default_warmup_rest_seconds', 120))
 
         # Валидация значений
         if not (1 <= default_round_count <= 99):
@@ -468,6 +473,10 @@ def settings_save():
             flash('Время отдыха должно быть от 0 до 9999 секунд', 'error')
             return redirect(url_for('settings'))
 
+        if not (0 <= default_warmup_rest_seconds <= 9999):
+            flash('Время отдыха после разминки должно быть от 0 до 9999 секунд', 'error')
+            return redirect(url_for('settings'))
+
         # Проверяем, есть ли уже настройки
         existing_prefs = UserPrefsModel.get_first()
 
@@ -477,7 +486,8 @@ def settings_save():
                 code=existing_prefs['code'],
                 default_repeat_count=default_repeat_count,
                 default_round_count=default_round_count,
-                default_rest_seconds=default_rest_seconds
+                default_rest_seconds=default_rest_seconds,
+                default_warmup_rest_seconds=default_warmup_rest_seconds
             )
             flash('Настройки успешно обновлены', 'success')
         else:
@@ -485,7 +495,8 @@ def settings_save():
             UserPrefsModel.create(
                 default_repeat_count=default_repeat_count,
                 default_round_count=default_round_count,
-                default_rest_seconds=default_rest_seconds
+                default_rest_seconds=default_rest_seconds,
+                default_warmup_rest_seconds=default_warmup_rest_seconds
             )
             flash('Настройки успешно сохранены', 'success')
 

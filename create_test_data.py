@@ -215,6 +215,31 @@ def create_test_workout_logs():
 
     print("Тестовые записи тренировок созданы!")
 
+def create_test_user_prefs():
+    """Создает тестовые настройки пользователя."""
+    try:
+        # Проверяем, есть ли уже настройки
+        existing_prefs = UserPrefsModel.get_first()
+
+        if existing_prefs:
+            print("  ✓ Настройки пользователя уже существуют")
+            return existing_prefs['code']
+
+        # Создаем новые настройки
+        code = UserPrefsModel.create(
+            default_repeat_count=15,
+            default_round_count=4,
+            default_rest_seconds=90,
+            default_warmup_rest_seconds=120,  # 2 минуты по умолчанию
+            timer_sound='default',
+            notifications_enabled=True
+        )
+        print("  ✓ Созданы настройки пользователя")
+        return code
+    except Exception as e:
+        print(f"  ❌ Ошибка при создании настроек: {e}")
+        return None
+
 def create_all_test_data():
     """Создает все тестовые данные включая журнал тренировок."""
     # Сначала создаем все остальные данные

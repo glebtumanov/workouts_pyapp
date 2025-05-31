@@ -58,6 +58,7 @@ def create_user_prefs_table(cursor):
             default_repeat_count INTEGER NOT NULL DEFAULT 10,
             default_round_count INTEGER NOT NULL DEFAULT 3,
             default_rest_seconds INTEGER NOT NULL DEFAULT 60,
+            default_warmup_rest_seconds INTEGER NOT NULL DEFAULT 120,
             timer_sound TEXT DEFAULT 'default',
             notifications_enabled BOOLEAN NOT NULL DEFAULT TRUE
         )
@@ -98,9 +99,9 @@ def init_default_user_prefs(cursor):
         cursor.execute('''
             INSERT INTO user_prefs (
                 code, default_repeat_count, default_round_count,
-                default_rest_seconds, timer_sound, notifications_enabled
-            ) VALUES (?, ?, ?, ?, ?, ?)
-        ''', (str(uuid4()), 10, 3, 60, 'default', True))
+                default_rest_seconds, default_warmup_rest_seconds, timer_sound, notifications_enabled
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (str(uuid4()), 10, 3, 60, 120, 'default', True))
         print("✓ Созданы настройки пользователя по умолчанию")
 
 
@@ -242,9 +243,22 @@ def migrate_database():
                     ADD COLUMN completed_exercises TEXT
                 ''')
                 conn.commit()
-                print("✓ Поле completed_exercises успешно добавлено")
-            else:
-                print("✓ Поле completed_exercises уже существует")
+                print("✓ Поле completed_exercises добавлено")
+
+            # Проверяем, есть ли уже поле default_warmup_rest_seconds в таблице user_prefs
+            cursor.execute("PRAGMA table_info(user_prefs)")
+            user_prefs_columns = [column[1] for column in cursor.fetchall()]
+
+            if 'default_warmup_rest_seconds' not in user_prefs_columns:
+                print("Добавляем поле default_warmup_rest_seconds в таблицу user_prefs...")
+                cursor.execute('''
+                    ALTER TABLE user_prefs
+                    ADD COLUMN default_warmup_rest_seconds INTEGER NOT NULL DEFAULT 120
+                ''')
+                conn.commit()
+                print("✓ Поле default_warmup_rest_seconds добавлено")
+
+            print("🎉 Миграция базы данных завершена успешно")
 
     except sqlite3.Error as e:
         print(f"❌ Ошибка при миграции базы данных: {e}")

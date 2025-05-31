@@ -38,7 +38,7 @@ class UserPrefsModel:
             cursor = conn.cursor()
             cursor.execute('''
                 SELECT default_repeat_count, default_round_count, default_rest_seconds,
-                       timer_sound, notifications_enabled
+                       default_warmup_rest_seconds, timer_sound, notifications_enabled
                 FROM user_prefs
                 LIMIT 1
             ''')
@@ -51,6 +51,7 @@ class UserPrefsModel:
                     'default_repeat_count': 10,
                     'default_round_count': 3,
                     'default_rest_seconds': 60,
+                    'default_warmup_rest_seconds': 120,
                     'timer_sound': 'default',
                     'notifications_enabled': True
                 }
@@ -62,7 +63,7 @@ class UserPrefsModel:
             cursor = conn.cursor()
             cursor.execute('''
                 SELECT code, default_repeat_count, default_round_count, default_rest_seconds,
-                       timer_sound, notifications_enabled
+                       default_warmup_rest_seconds, timer_sound, notifications_enabled
                 FROM user_prefs
                 LIMIT 1
             ''')
@@ -71,8 +72,8 @@ class UserPrefsModel:
 
     @staticmethod
     def create(default_repeat_count: int = 10, default_round_count: int = 3,
-               default_rest_seconds: int = 60, timer_sound: str = 'default',
-               notifications_enabled: bool = True) -> str:
+               default_rest_seconds: int = 60, default_warmup_rest_seconds: int = 120,
+               timer_sound: str = 'default', notifications_enabled: bool = True) -> str:
         """Создает новые настройки пользователя."""
         code = str(uuid4())
         with get_db_connection() as conn:
@@ -80,27 +81,27 @@ class UserPrefsModel:
             cursor.execute('''
                 INSERT INTO user_prefs (
                     code, default_repeat_count, default_round_count, default_rest_seconds,
-                    timer_sound, notifications_enabled
-                ) VALUES (?, ?, ?, ?, ?, ?)
+                    default_warmup_rest_seconds, timer_sound, notifications_enabled
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
             ''', (code, default_repeat_count, default_round_count, default_rest_seconds,
-                  timer_sound, notifications_enabled))
+                  default_warmup_rest_seconds, timer_sound, notifications_enabled))
             conn.commit()
         return code
 
     @staticmethod
     def update(code: str, default_repeat_count: int = 10, default_round_count: int = 3,
-               default_rest_seconds: int = 60, timer_sound: str = 'default',
-               notifications_enabled: bool = True) -> bool:
+               default_rest_seconds: int = 60, default_warmup_rest_seconds: int = 120,
+               timer_sound: str = 'default', notifications_enabled: bool = True) -> bool:
         """Обновляет настройки пользователя."""
         with get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute('''
                 UPDATE user_prefs
                 SET default_repeat_count = ?, default_round_count = ?, default_rest_seconds = ?,
-                    timer_sound = ?, notifications_enabled = ?
+                    default_warmup_rest_seconds = ?, timer_sound = ?, notifications_enabled = ?
                 WHERE code = ?
             ''', (default_repeat_count, default_round_count, default_rest_seconds,
-                  timer_sound, notifications_enabled, code))
+                  default_warmup_rest_seconds, timer_sound, notifications_enabled, code))
             conn.commit()
             return cursor.rowcount > 0
 

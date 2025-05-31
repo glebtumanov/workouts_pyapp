@@ -68,6 +68,7 @@ class WorkoutState {
             currentExerciseIndex: 0,
             currentRound: 0,
             isResting: false,
+            isWarmingUp: false,
             startTime: Date.now(),
             completedRounds: {},
             restEndTime: null
@@ -203,7 +204,7 @@ class WorkoutState {
      */
     static getCurrentDuration() {
         const activeWorkout = this.getActive();
-        if (activeWorkout && activeWorkout.startTime) {
+        if (activeWorkout && activeWorkout.startTime && !activeWorkout.isWarmingUp) {
             return Math.floor((Date.now() - activeWorkout.startTime) / 1000);
         }
         return 0;
