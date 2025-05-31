@@ -117,8 +117,26 @@
                                     <div class="col-auto">
                                         <small class="text-muted">Фото:</small>
                                         <span class="badge bg-dark">{{ exercise.images|length if exercise.images else 0 }}</span>
+                                        {% if exercise.images and exercise.images|length > 0 %}
+                                            <button type="button" class="btn btn-link btn-sm p-0 ms-1 toggle-images-btn" style="font-size: 0.75rem; text-decoration: none;">
+                                                Показать
+                                            </button>
+                                        {% endif %}
                                     </div>
                                 </div>
+
+                                <!-- Контейнер для миниатюр изображений -->
+                                {% if exercise.images and exercise.images|length > 0 %}
+                                <div class="exercise-images-container mt-2" style="display: none;">
+                                    <div class="d-flex flex-wrap gap-2">
+                                        {% for image_path in exercise.images %}
+                                            <img src="/static/{{ image_path }}"
+                                                 class="img-thumbnail"
+                                                 style="max-width: 150px; max-height: 150px;">
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                {% endif %}
 
                                 <!-- Скрытые данные упражнения -->
                                 <input type="hidden" class="exercise-data" value="{{ exercise|tojson }}">
@@ -272,6 +290,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Показать форму добавления упражнения
     addBtn.addEventListener('click', function() {
+        // Сначала полностью очищаем форму
+        clearExerciseForm();
+
         addBtn.style.display = 'none';
         newExerciseForm.classList.remove('d-none');
 
@@ -358,7 +379,18 @@ document.addEventListener('DOMContentLoaded', function() {
         if (nameField) nameField.value = '';
         if (descField) descField.value = '';
         if (videoField) videoField.value = '';
-        if (imageField) imageField.value = '';
+        if (imageField) {
+            // Правильная очистка файлового поля
+            imageField.value = '';
+            imageField.files = new DataTransfer().files; // Создаем пустой FileList
+
+            // Удаляем старые обработчики событий и создаем новые
+            const newImageField = imageField.cloneNode(true);
+            imageField.parentNode.replaceChild(newImageField, imageField);
+
+            // Переназначаем обработчик для нового поля
+            bindImagePreview(exerciseForm);
+        }
         if (previewField) previewField.innerHTML = '';
         if (existingImagesContainer) existingImagesContainer.remove();
         if (deletedImagesInput) deletedImagesInput.remove();
@@ -437,8 +469,19 @@ document.addEventListener('DOMContentLoaded', function() {
                     <div class="col-auto">
                         <small class="text-muted">Фото:</small>
                         <span class="badge bg-dark">${exerciseData.images ? exerciseData.images.length : 0}</span>
+                        ${exerciseData.images && exerciseData.images.length > 0 ?
+                            '<button type="button" class="btn btn-link btn-sm p-0 ms-1 toggle-images-btn" style="font-size: 0.75rem; text-decoration: none;">Показать</button>' : ''}
                     </div>
                 </div>
+
+                ${exerciseData.images && exerciseData.images.length > 0 ?
+                    `<div class="exercise-images-container mt-2" style="display: none;">
+                        <div class="d-flex flex-wrap gap-2">
+                            ${exerciseData.images.map(imagePath =>
+                                `<img src="/static/${imagePath}" class="img-thumbnail" style="max-width: 150px; max-height: 150px;">`
+                            ).join('')}
+                        </div>
+                    </div>` : ''}
 
                 <input type="hidden" class="exercise-data" value='${JSON.stringify(exerciseData)}'>
             </div>
@@ -552,12 +595,18 @@ document.addEventListener('DOMContentLoaded', function() {
         const imagePreview = exerciseForm.querySelector('.image-preview');
 
         if (imageInput && imagePreview) {
-            imageInput.addEventListener('change', function() {
+            // Удаляем все предыдущие обработчики
+            const newImageInput = imageInput.cloneNode(true);
+            imageInput.parentNode.replaceChild(newImageInput, imageInput);
+
+            // Добавляем обработчик на новый элемент
+            newImageInput.addEventListener('change', function() {
                 const files = Array.from(this.files);
                 imagePreview.innerHTML = '';
 
+                // Обрабатываем только текущие файлы
                 files.forEach((file) => {
-                    if (file.type.startsWith('image/')) {
+                    if (file && file.type.startsWith('image/')) {
                         const reader = new FileReader();
                         reader.onload = function(e) {
                             const img = document.createElement('img');
@@ -815,8 +864,19 @@ document.addEventListener('DOMContentLoaded', function() {
                     <div class="col-auto">
                         <small class="text-muted">Фото:</small>
                         <span class="badge bg-dark">${exerciseData.images ? exerciseData.images.length : 0}</span>
+                        ${exerciseData.images && exerciseData.images.length > 0 ?
+                            '<button type="button" class="btn btn-link btn-sm p-0 ms-1 toggle-images-btn" style="font-size: 0.75rem; text-decoration: none;">Показать</button>' : ''}
                     </div>
                 </div>
+
+                ${exerciseData.images && exerciseData.images.length > 0 ?
+                    `<div class="exercise-images-container mt-2" style="display: none;">
+                        <div class="d-flex flex-wrap gap-2">
+                            ${exerciseData.images.map(imagePath =>
+                                `<img src="/static/${imagePath}" class="img-thumbnail" style="max-width: 150px; max-height: 150px;">`
+                            ).join('')}
+                        </div>
+                    </div>` : ''}
 
                 <input type="hidden" class="exercise-data" value='${JSON.stringify(exerciseData)}'>
             </div>
@@ -1016,8 +1076,37 @@ document.addEventListener('DOMContentLoaded', function() {
         hideNewExerciseForm();
         clearExerciseForm();
 
-        // Восстанавливаем оригинальные обработчики кнопок
-        location.reload(); // Простое решение для восстановления обработчиков
+        // Восстанавливаем оригинальные обработчики кнопок без перезагрузки страницы
+        const saveBtn = document.getElementById('saveExerciseBtn');
+        const cancelBtn = document.getElementById('cancelExerciseBtn');
+
+        if (saveBtn && cancelBtn) {
+            // Удаляем старые обработчики
+            const newSaveBtn = saveBtn.cloneNode(true);
+            const newCancelBtn = cancelBtn.cloneNode(true);
+
+            saveBtn.parentNode.replaceChild(newSaveBtn, saveBtn);
+            cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
+
+            // Восстанавливаем оригинальные обработчики
+            newSaveBtn.addEventListener('click', function() {
+                const exerciseForm = newExerciseForm.querySelector('.exercise-form');
+                const name = exerciseForm.querySelector('.exercise-name').value.trim();
+
+                if (!name) {
+                    alert('Пожалуйста, введите название упражнения');
+                    return;
+                }
+
+                // Создаем упражнение через AJAX
+                createExercise(exerciseForm);
+            });
+
+            newCancelBtn.addEventListener('click', function() {
+                hideNewExerciseForm();
+                clearExerciseForm();
+            });
+        }
     }
 
     // Привязываем события к существующим карточкам
@@ -1028,6 +1117,21 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+
+    // Универсальный обработчик для кнопок переключения изображений через делегирование
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('toggle-images-btn')) {
+            const card = e.target.closest('.exercise-card');
+            if (!card) return;
+
+            const imagesContainer = card.querySelector('.exercise-images-container');
+            if (!imagesContainer) return;
+
+            const isHidden = window.getComputedStyle(imagesContainer).display === 'none';
+            imagesContainer.style.display = isHidden ? 'block' : 'none';
+            e.target.textContent = isHidden ? 'Скрыть' : 'Показать';
+        }
+    });
 });
 </script>
 {% endblock %}

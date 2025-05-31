@@ -368,3 +368,12 @@ class WorkoutLogModel:
             cursor.execute('DELETE FROM workout_logs WHERE code = ?', (code,))
             conn.commit()
             return cursor.rowcount > 0
+
+    @staticmethod
+    def delete_by_workoutset(workoutset_code: str) -> int:
+        """Удаляет все записи тренировок для указанного комплекса."""
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('DELETE FROM workout_logs WHERE workoutset_code = ?', (workoutset_code,))
+            conn.commit()
+            return cursor.rowcount

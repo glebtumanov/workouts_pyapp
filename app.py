@@ -230,9 +230,11 @@ def workout_sets_update(code):
 def workout_sets_delete(code):
     """Удаление комплекса"""
     try:
-        # Сначала удаляем все упражнения
+        # Сначала удаляем все записи тренировок для этого комплекса
+        WorkoutLogModel.delete_by_workoutset(code)
+        # Затем удаляем все упражнения (они могут удалиться автоматически через CASCADE)
         ExerciseModel.delete_by_workoutset(code)
-        # Затем удаляем сам комплекс
+        # Наконец удаляем сам комплекс
         success = WorkoutSetModel.delete(code)
         if success:
             flash('Комплекс успешно удален', 'success')
