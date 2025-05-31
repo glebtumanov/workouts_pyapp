@@ -49,7 +49,10 @@
                 <div class="card border-warning" id="timerCard" style="display: none;">
                     <div class="card-body text-center">
                         <h3 class="text-warning mb-2">Отдых</h3>
-                        <div class="display-1 fw-bold text-warning" id="timerDisplay">00:00</div>
+                        <div class="display-1 fw-bold text-warning">
+                            <span id="timerDisplay">00:00</span>
+                            <span id="timerTotalTime" class="text-warning" style="font-size: 0.4em;"> (00:00)</span>
+                        </div>
                         <p class="text-muted mb-0" id="timerExerciseName"></p>
                     </div>
                 </div>
@@ -83,9 +86,9 @@
 
                             <!-- Параметры упражнения -->
                             <div class="mb-3">
-                                <span class="badge bg-info me-1">{{ exercise.round_count }} подходов</span>
-                                <span class="badge bg-success me-1">{{ exercise.repeat_count }} раз</span>
-                                <span class="badge bg-warning">{{ exercise.rest_seconds }}с отдых</span>
+                                <span class="badge bg-primary me-1">{{ exercise.round_count }} подходов</span>
+                                <span class="badge bg-success me-1">{{ exercise.repeat_count }} повторений</span>
+                                <span class="badge bg-danger">{{ exercise.rest_seconds }}с отдых</span>
                             </div>
 
                             <!-- Миниатюры изображений -->
@@ -94,7 +97,7 @@
                                     {% for image in exercise.images[:2] %}
                                         <img src="{{ url_for('static', filename=image) }}"
                                              class="img-thumbnail me-1"
-                                             style="width: 60px; height: 60px; object-fit: cover;"
+                                             style="width: 90px; height: 90px; object-fit: cover;"
                                              alt="Упражнение">
                                     {% endfor %}
                                     {% if exercise.images|length > 2 %}
@@ -550,9 +553,14 @@ class WorkoutSession {
         const timerCard = document.getElementById('timerCard');
         const timerDisplay = document.getElementById('timerDisplay');
         const timerExerciseNameEl = document.getElementById('timerExerciseName');
+        const timerTotalTimeEl = document.getElementById('timerTotalTime');
 
         timerCard.style.display = 'block';
         timerExerciseNameEl.textContent = exerciseName;
+
+        // Сохраняем общее время отдыха для отображения в скобках
+        this.totalRestSeconds = seconds;
+
         this.updateTimerDisplay(seconds);
 
         // Прокручиваем к таймеру
@@ -579,6 +587,16 @@ class WorkoutSession {
         const secs = seconds % 60;
         const timeString = `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
         document.getElementById('timerDisplay').textContent = timeString;
+
+        // Показываем общее время отдыха в скобках (статическое)
+        const totalMinutes = Math.floor(this.totalRestSeconds / 60);
+        const totalSecs = this.totalRestSeconds % 60;
+        const totalTimeString = `${totalMinutes.toString().padStart(2, '0')}:${totalSecs.toString().padStart(2, '0')}`;
+
+        const timerTotalTimeEl = document.getElementById('timerTotalTime');
+        if (timerTotalTimeEl) {
+            timerTotalTimeEl.textContent = ` (${totalTimeString})`;
+        }
     }
 
     endRest() {
