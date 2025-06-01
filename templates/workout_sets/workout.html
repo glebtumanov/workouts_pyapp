@@ -111,14 +111,14 @@
                             <!-- Миниатюры изображений -->
                             {% if exercise.images %}
                                 <div class="exercise-images mb-3">
-                                    {% for image in exercise.images[:2] %}
+                                    {% for image in exercise.images[:3] %}
                                         <img src="{{ url_for('static', filename=image) }}"
                                              class="img-thumbnail me-1"
                                              style="width: 90px; height: 90px; object-fit: cover;"
                                              alt="Упражнение">
                                     {% endfor %}
-                                    {% if exercise.images|length > 2 %}
-                                        <span class="text-muted small">+{{ exercise.images|length - 2 }}</span>
+                                    {% if exercise.images|length > 3 %}
+                                        <span class="text-muted small">+{{ exercise.images|length - 3 }}</span>
                                     {% endif %}
                                 </div>
                             {% endif %}
@@ -199,6 +199,24 @@
                         <a href="{{ url_for('workout_sets_list') }}" class="btn btn-primary">
                             <i class="bi bi-arrow-left"></i> К списку комплексов
                         </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Модальное окно для показа изображений -->
+        <div class="modal fade" id="imageModal" tabindex="-1" aria-labelledby="imageModalTitle" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="imageModalTitle">Изображение упражнения</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                    </div>
+                    <div class="modal-body text-center p-2 position-relative">
+                        <img id="modalImage" src="" class="img-fluid" style="max-width: 100%; max-height: 1000px; object-fit: contain;" alt="Упражнение">
+                        <div id="imageHint" class="position-absolute top-0 end-0 m-2 text-muted small" style="background: rgba(0,0,0,0.6); padding: 4px 8px; border-radius: 4px; display: none;">
+                            Кликните для следующего изображения
+                        </div>
                     </div>
                 </div>
             </div>
@@ -393,6 +411,36 @@ class WorkoutSession {
             });
         });
 
+        // Обработчики кликов на изображения упражнений
+        document.querySelectorAll('.exercise-images img').forEach(img => {
+            console.log('🔥 Добавляем обработчик клика для изображения:', img.src);
+            img.style.cursor = 'pointer';
+            img.addEventListener('click', (e) => {
+                console.log('🔥 Клик по изображению в карточке:', e.target.src);
+                const exerciseCard = e.target.closest('.card');
+                const exerciseName = exerciseCard.querySelector('.card-title').textContent.trim();
+
+                // Получаем все изображения упражнения
+                let allImages = [];
+                try {
+                    const imagesData = exerciseCard.dataset.exerciseImages;
+                    allImages = JSON.parse(imagesData).map(imagePath => `/static/${imagePath}`);
+                } catch (e) {
+                    allImages = [e.target.src];
+                }
+
+                // Находим индекс кликнутого изображения
+                const clickedImageIndex = allImages.findIndex(imgSrc => e.target.src.endsWith(imgSrc.replace('/static/', '')));
+                const currentIndex = clickedImageIndex >= 0 ? clickedImageIndex : 0;
+
+                console.log('🔥 Название упражнения:', exerciseName);
+                console.log('🔥 Все изображения:', allImages);
+                console.log('🔥 Текущий индекс:', currentIndex);
+
+                this.showImageModal(e.target.src, exerciseName, allImages, currentIndex);
+            });
+        });
+
         // Обработчик кнопки завершения разминки
         const warmupBtn = document.getElementById('warmupCompleteBtn');
         if (warmupBtn) {
@@ -507,8 +555,33 @@ class WorkoutSession {
                 const img = document.createElement('img');
                 img.src = `/static/${imagePath}`;
                 img.className = 'img-thumbnail me-2';
-                img.style.cssText = 'width: 160px; height: 160px; object-fit: cover;';
+                img.style.cssText = 'width: 160px; height: 160px; object-fit: cover; cursor: pointer; transition: transform 0.2s ease, box-shadow 0.2s ease;';
                 img.alt = 'Упражнение';
+
+                // Добавляем обработчик клика для показа в модальном окне
+                img.addEventListener('click', () => {
+                    console.log('🔥 Клик по изображению в панели:', img.src, 'упражнение:', exerciseName);
+
+                    // Формируем массив всех изображений для модального окна
+                    const allImages = exerciseImages.map(imagePath => `/static/${imagePath}`);
+
+                    console.log('🔥 Все изображения панели:', allImages);
+                    console.log('🔥 Текущий индекс в панели:', index);
+
+                    this.showImageModal(img.src, exerciseName, allImages, index);
+                });
+
+                // Добавляем эффект при наведении
+                img.addEventListener('mouseenter', () => {
+                    img.style.transform = 'scale(1.05)';
+                    img.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.2)';
+                });
+
+                img.addEventListener('mouseleave', () => {
+                    img.style.transform = 'scale(1)';
+                    img.style.boxShadow = 'none';
+                });
+
                 imagesContainer.appendChild(img);
             }
         });
@@ -870,6 +943,154 @@ class WorkoutSession {
         const completeModal = new bootstrap.Modal(document.getElementById('completeModal'));
         completeModal.show();
     }
+
+    showImageModal(imageSrc, exerciseName, allImages = null, currentIndex = 0) {
+        console.log('🔥 showImageModal вызвана с:', imageSrc, exerciseName, 'все изображения:', allImages);
+
+        // Устанавливаем источник изображения и название
+        const modalImage = document.getElementById('modalImage');
+        const modalTitle = document.getElementById('imageModalTitle');
+        const modalElement = document.getElementById('imageModal');
+
+        console.log('🔥 Элементы модального окна найдены:', {
+            modalImage: !!modalImage,
+            modalTitle: !!modalTitle,
+            modalElement: !!modalElement
+        });
+
+        if (!modalImage || !modalTitle || !modalElement) {
+            console.error('🔥 Не найдены элементы модального окна!');
+            return;
+        }
+
+        // Если передан только один src, создаем массив из него
+        if (!allImages) {
+            allImages = [imageSrc];
+            currentIndex = 0;
+        }
+
+        // Сохраняем данные изображений в модальном окне
+        modalElement.currentImages = allImages;
+        modalElement.currentImageIndex = currentIndex;
+        modalElement.exerciseName = exerciseName;
+
+        // Устанавливаем текущее изображение
+        this.updateModalImage(modalImage, modalTitle, allImages, currentIndex, exerciseName);
+
+        // Удаляем предыдущие обработчики клика на изображение
+        modalImage.removeEventListener('click', modalImage.clickHandler);
+
+        // Добавляем новый обработчик клика для переключения изображений
+        modalImage.clickHandler = () => {
+            this.nextModalImage(modalImage, modalTitle, modalElement);
+        };
+        modalImage.addEventListener('click', modalImage.clickHandler);
+        modalImage.style.cursor = 'pointer';
+
+        console.log('🔥 Устанавливаем изображение:', imageSrc);
+        console.log('🔥 Устанавливаем заголовок:', modalTitle.textContent);
+
+        // Проверяем наличие Bootstrap
+        if (typeof bootstrap !== 'undefined') {
+            console.log('🔥 Bootstrap найден, используем Bootstrap модальное окно');
+            try {
+                const imageModal = new bootstrap.Modal(modalElement);
+                console.log('🔥 Модальное окно создано, показываем...');
+                imageModal.show();
+            } catch (error) {
+                console.error('🔥 Ошибка при показе Bootstrap модального окна:', error);
+                this.showSimpleModal(modalElement);
+            }
+        } else {
+            console.log('🔥 Bootstrap не найден, используем простое модальное окно');
+            this.showSimpleModal(modalElement);
+        }
+    }
+
+    updateModalImage(modalImage, modalTitle, allImages, currentIndex, exerciseName) {
+        const currentImageSrc = allImages[currentIndex];
+        modalImage.src = currentImageSrc;
+
+        // Обновляем заголовок с индикатором текущего изображения
+        if (allImages.length > 1) {
+            modalTitle.textContent = `${exerciseName} - Изображение ${currentIndex + 1} из ${allImages.length}`;
+
+            // Показываем подсказку о возможности переключения
+            const imageHint = document.getElementById('imageHint');
+            if (imageHint) {
+                imageHint.style.display = 'block';
+            }
+        } else {
+            modalTitle.textContent = `${exerciseName} - Изображение упражнения`;
+
+            // Скрываем подсказку если изображение одно
+            const imageHint = document.getElementById('imageHint');
+            if (imageHint) {
+                imageHint.style.display = 'none';
+            }
+        }
+    }
+
+    nextModalImage(modalImage, modalTitle, modalElement) {
+        const allImages = modalElement.currentImages;
+        const currentIndex = modalElement.currentImageIndex;
+        const exerciseName = modalElement.exerciseName;
+
+        if (!allImages || allImages.length <= 1) {
+            return; // Нет смысла переключать, если изображение одно или их нет
+        }
+
+        // Переходим к следующему изображению (циклично)
+        const nextIndex = (currentIndex + 1) % allImages.length;
+        modalElement.currentImageIndex = nextIndex;
+
+        console.log('🔥 Переключаем на изображение:', nextIndex + 1, 'из', allImages.length);
+
+        // Обновляем изображение и заголовок
+        this.updateModalImage(modalImage, modalTitle, allImages, nextIndex, exerciseName);
+    }
+
+    showSimpleModal(modalElement) {
+        // Простая реализация без Bootstrap
+        modalElement.style.display = 'block';
+        modalElement.classList.add('show');
+        modalElement.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('modal-open');
+
+        // Создаем backdrop
+        const backdrop = document.createElement('div');
+        backdrop.className = 'modal-backdrop fade show';
+        document.body.appendChild(backdrop);
+
+        // Обработчик закрытия
+        const closeModal = () => {
+            modalElement.style.display = 'none';
+            modalElement.classList.remove('show');
+            modalElement.setAttribute('aria-hidden', 'true');
+            document.body.classList.remove('modal-open');
+            if (backdrop) {
+                backdrop.remove();
+            }
+        };
+
+        // Закрытие по клику на backdrop
+        backdrop.addEventListener('click', closeModal);
+
+        // Закрытие по кнопке
+        const closeBtn = modalElement.querySelector('.btn-close');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', closeModal);
+        }
+
+        // Закрытие по Escape
+        const escHandler = (e) => {
+            if (e.key === 'Escape') {
+                closeModal();
+                document.removeEventListener('keydown', escHandler);
+            }
+        };
+        document.addEventListener('keydown', escHandler);
+    }
 }
 
 // Инициализация тренировки
@@ -937,6 +1158,17 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log('🔥 Состояние пустое');
         }
     };
+
+    // Функция для тестирования модального окна с изображением
+    window.testImageModal = function() {
+        console.log('🔥 Тестируем модальное окно с изображением...');
+        if (window.workoutSession) {
+            // Используем любое доступное изображение или заглушку
+            window.workoutSession.showImageModal('/static/images/test.jpg', 'Тестовое упражнение');
+        } else {
+            console.error('🔥 WorkoutSession не найден!');
+        }
+    };
 });
 </script>
 
@@ -991,6 +1223,44 @@ document.addEventListener('DOMContentLoaded', function() {
 
 .exercise-images img {
     border-radius: 4px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.exercise-images img:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+#imageModal .modal-dialog {
+    max-width: 1000px;
+}
+
+#imageModal .modal-body {
+    padding: 10px;
+    background-color: #f8f9fa;
+}
+
+#modalImage {
+    max-width: 1000px;
+    max-height: 1000px;
+    width: auto;
+    height: auto;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transition: opacity 0.2s ease;
+}
+
+#modalImage:hover {
+    opacity: 0.9;
+}
+
+#imageHint {
+    transition: opacity 0.3s ease;
+    opacity: 0.8;
+}
+
+#imageHint:hover {
+    opacity: 1;
 }
 </style>
 {% endblock %}
