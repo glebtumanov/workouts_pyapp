@@ -158,68 +158,78 @@ def workout_sets_update(code):
 
         # Проверяем, есть ли данные упражнений для обработки
         exercises_data_raw = request.form.get('exercises_data', '').strip()
-        if exercises_data_raw:
-            # Обрабатываем упражнения только если есть данные
-            exercises_data = json.loads(exercises_data_raw)
 
-            # Получаем существующие упражнения
-            existing_exercises = {ex['code']: ex for ex in ExerciseModel.get_by_workoutset(code)}
-            processed_codes = set()
+        # Обрабатываем упражнения ТОЛЬКО если есть данные упражнений
+        # Это предотвращает удаление упражнений при простом редактировании названия/описания
+        if exercises_data_raw and exercises_data_raw != '[]':
+            try:
+                exercises_data = json.loads(exercises_data_raw)
 
-            ensure_upload_folder()
+                # Дополнительная проверка: обрабатываем только если есть упражнения
+                if exercises_data:
+                    # Получаем существующие упражнения
+                    existing_exercises = {ex['code']: ex for ex in ExerciseModel.get_by_workoutset(code)}
+                    processed_codes = set()
 
-            for exercise_index, exercise_data in enumerate(exercises_data):
-                if not exercise_data.get('name', '').strip():
-                    continue
+                    ensure_upload_folder()
 
-                exercise_code = exercise_data.get('code')
-                images = exercise_data.get('existing_images', [])
+                    for exercise_index, exercise_data in enumerate(exercises_data):
+                        if not exercise_data.get('name', '').strip():
+                            continue
 
-                # Обрабатываем новые изображения для данного упражнения
-                image_pattern = f'exercise_{exercise_index}_image_'
-                for field_name in request.files:
-                    if field_name.startswith(image_pattern):
-                        image_file = request.files[field_name]
-                        if (image_file and image_file.filename != '' and
-                            allowed_file(image_file.filename)):
+                        exercise_code = exercise_data.get('code')
+                        images = exercise_data.get('existing_images', [])
 
-                            filename = secure_filename(image_file.filename)
-                            filename = f"{code}_{exercise_index}_{len(images)}_{filename}"
-                            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-                            image_file.save(filepath)
-                            images.append(f"images/exercises/{filename}")
+                        # Обрабатываем новые изображения для данного упражнения
+                        image_pattern = f'exercise_{exercise_index}_image_'
+                        for field_name in request.files:
+                            if field_name.startswith(image_pattern):
+                                image_file = request.files[field_name]
+                                if (image_file and image_file.filename != '' and
+                                    allowed_file(image_file.filename)):
 
-                if exercise_code and exercise_code in existing_exercises:
-                    # Обновляем существующее упражнение
-                    ExerciseModel.update(
-                        code=exercise_code,
-                        name=exercise_data['name'],
-                        description=exercise_data.get('description', ''),
-                        images=images,
-                        video_url=exercise_data.get('video_url', ''),
-                        repeat_count=int(exercise_data.get('repeat_count', 10)),
-                        round_count=int(exercise_data.get('round_count', 3)),
-                        rest_seconds=int(exercise_data.get('rest_seconds', 60))
-                    )
-                    processed_codes.add(exercise_code)
-                else:
-                    # Создаем новое упражнение
-                    new_code = ExerciseModel.create(
-                        workoutset_code=code,
-                        name=exercise_data['name'],
-                        description=exercise_data.get('description', ''),
-                        images=images,
-                        video_url=exercise_data.get('video_url', ''),
-                        repeat_count=int(exercise_data.get('repeat_count', 10)),
-                        round_count=int(exercise_data.get('round_count', 3)),
-                        rest_seconds=int(exercise_data.get('rest_seconds', 60))
-                    )
-                    processed_codes.add(new_code)
+                                    filename = secure_filename(image_file.filename)
+                                    filename = f"{code}_{exercise_index}_{len(images)}_{filename}"
+                                    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                                    image_file.save(filepath)
+                                    images.append(f"images/exercises/{filename}")
 
-            # Удаляем упражнения, которые не были обработаны
-            for exercise_code in existing_exercises:
-                if exercise_code not in processed_codes:
-                    ExerciseModel.delete(exercise_code)
+                        if exercise_code and exercise_code in existing_exercises:
+                            # Обновляем существующее упражнение
+                            ExerciseModel.update(
+                                code=exercise_code,
+                                name=exercise_data['name'],
+                                description=exercise_data.get('description', ''),
+                                images=images,
+                                video_url=exercise_data.get('video_url', ''),
+                                repeat_count=int(exercise_data.get('repeat_count', 10)),
+                                round_count=int(exercise_data.get('round_count', 3)),
+                                rest_seconds=int(exercise_data.get('rest_seconds', 60))
+                            )
+                            processed_codes.add(exercise_code)
+                        else:
+                            # Создаем новое упражнение
+                            new_code = ExerciseModel.create(
+                                workoutset_code=code,
+                                name=exercise_data['name'],
+                                description=exercise_data.get('description', ''),
+                                images=images,
+                                video_url=exercise_data.get('video_url', ''),
+                                repeat_count=int(exercise_data.get('repeat_count', 10)),
+                                round_count=int(exercise_data.get('round_count', 3)),
+                                rest_seconds=int(exercise_data.get('rest_seconds', 60))
+                            )
+                            processed_codes.add(new_code)
+
+                    # Удаляем упражнения, которые не были обработаны
+                    # Это происходит ТОЛЬКО при обработке данных упражнений
+                    for exercise_code in existing_exercises:
+                        if exercise_code not in processed_codes:
+                            ExerciseModel.delete(exercise_code)
+
+            except json.JSONDecodeError:
+                flash('Ошибка при обработке данных упражнений', 'error')
+                return redirect(url_for('workout_sets_edit', code=code))
 
         flash('Информация о комплексе успешно сохранена', 'success')
         return redirect(url_for('workout_sets_edit', code=code))
